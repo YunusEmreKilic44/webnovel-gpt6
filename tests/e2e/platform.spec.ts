@@ -5,8 +5,23 @@ test("keşif, arama ve mobil okuma", async ({ page }) => {
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "Bir sonraki dünyanı keşfet." }),
+    page.getByRole("heading", { name: "Kül ve Yıldız", level: 1, exact: true }),
   ).toBeVisible();
+  await page.locator(".book-card").last().scrollIntoViewIfNeeded();
+  await expect
+    .poll(() =>
+      page
+        .locator(".book-card-image img")
+        .evaluateAll((images) =>
+          images.every(
+            (image) =>
+              (image as HTMLImageElement).complete &&
+              (image as HTMLImageElement).naturalWidth > 0,
+          ),
+        ),
+    )
+    .toBe(true);
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({
     path: "test-results/home-desktop.png",
     fullPage: true,
@@ -22,6 +37,21 @@ test("keşif, arama ve mobil okuma", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Gece Ekspresi", exact: true }),
   ).toBeVisible();
+  await page.screenshot({
+    path: "test-results/book-desktop.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: "test-results/book-mobile.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 1440, height: 1080 });
   await page.getByRole("link", { name: "Okumaya başla" }).click();
   await expect(page.getByRole("heading", { name: "Son sefer" })).toBeVisible();
   await expect(page.locator(".prose-content")).toContainText(
@@ -49,8 +79,15 @@ test("keşif, arama ve mobil okuma", async ({ page }) => {
   ).toBe(true);
   await page.getByRole("button", { name: "Menüyü aç" }).click();
   await expect(
-    page.getByRole("link", { name: "Yazar stüdyosu", exact: true }),
+    page
+      .getByRole("dialog", { name: "Gezinme menüsü" })
+      .getByRole("link", { name: "Yazar stüdyosu", exact: true }),
   ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("dialog", { name: "Gezinme menüsü" }),
+  ).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Menüyü aç" })).toBeFocused();
   expect(errors).toEqual([]);
 });
 
@@ -147,15 +184,24 @@ test("kayıt, kütüphane, yorum, yayın ve premium onayı", async ({
   await application
     .getByLabel("Karar gerekçesi")
     .fill("Başvuru metni incelendi, yayın için uygun.");
-  await application.getByRole("button", { name: "Onayla" }).click();
+  await application
+    .getByRole("button", { name: "Onayla ve yayımla", exact: true })
+    .click();
   await expect(application.getByText(/Onaylandı/)).toBeVisible();
   await page.goto(bookUrl);
   const firstChapterLink = page.getByRole("link", { name: /İlk Bölüm/ });
   const firstChapterUrl = (await firstChapterLink.getAttribute("href"))!;
-  await firstChapterLink.click();
-  await page.getByRole("button", { name: "Bölümü yayımla" }).click();
+  const publicBookUrl = (await page
+    .getByRole("link", { name: "Kitabı gör" })
+    .getAttribute("href"))!;
+  await page.goto("/kesfet?sort=recent");
   await expect(
-    page.getByText("Bölüm yayımlandı.", { exact: true }),
+    page.locator(`a[href="${publicBookUrl}"]`).first(),
+  ).toBeVisible();
+  await page.goto(bookUrl);
+  await page.getByRole("link", { name: /İlk Bölüm/ }).click();
+  await expect(
+    page.getByText("Yayında · Taslağı düzenliyorsun", { exact: true }),
   ).toBeVisible();
   await page.goto(bookUrl);
   await page

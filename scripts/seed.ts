@@ -1,13 +1,5 @@
 import "dotenv/config";
 import { openDatabase } from "../src/db";
-import {
-  books,
-  chapters,
-  comments,
-  ratings,
-  user,
-  volumes,
-} from "../src/db/schema";
 import { wordCount } from "../src/modules/publishing/content";
 
 const stories = [
@@ -145,56 +137,61 @@ const continuation = [
 ];
 const { db, close } = openDatabase();
 try {
-  const exists = await db.select({ id: books.id }).from(books).limit(1);
+  const exists = await db.book.findMany({ take: 1, select: { id: true } });
   if (exists.length) {
     console.log("Veritabanında kitap var; örnek veriler tekrar eklenmedi.");
   } else {
-    await db.transaction(async (tx) => {
+    await db.$transaction(async (tx) => {
       for (let n = 0; n < 8; n++)
-        await tx.insert(user).values({
-          id: `sample-reader-${n}`,
-          name: [
-            "Zeynep",
-            "Kerem",
-            "Duru",
-            "Emir",
-            "İpek",
-            "Ege",
-            "Yağmur",
-            "Can",
-          ][n],
-          email: `reader${n}@example.test`,
-          emailVerified: true,
+        await tx.user.create({
+          data: {
+            id: `sample-reader-${n}`,
+            name: [
+              "Zeynep",
+              "Kerem",
+              "Duru",
+              "Emir",
+              "İpek",
+              "Ege",
+              "Yağmur",
+              "Can",
+            ][n],
+            email: `reader${n}@example.test`,
+            emailVerified: true,
+          },
         });
       for (const [storyIndex, story] of stories.entries()) {
         const authorId = `sample-author-${storyIndex}`;
-        await tx.insert(user).values({
-          id: authorId,
-          name: story.author,
-          email: `author${storyIndex}@example.test`,
-          emailVerified: true,
+        await tx.user.create({
+          data: {
+            id: authorId,
+            name: story.author,
+            email: `author${storyIndex}@example.test`,
+            emailVerified: true,
+          },
         });
-        await tx.insert(books).values({
-          id: story.id,
-          authorId,
-          slug: story.id,
-          title: story.title,
-          subtitle: story.subtitle,
-          description: story.description,
-          genre: story.genre,
-          cover: story.cover,
-          status: "PUBLISHED",
-          storyStatus: storyIndex === 4 ? "COMPLETED" : "ONGOING",
-          featured: storyIndex === 0,
-          updatedAt: new Date(Date.now() - storyIndex * 86400000),
+        await tx.book.create({
+          data: {
+            id: story.id,
+            authorId,
+            slug: story.id,
+            title: story.title,
+            subtitle: story.subtitle,
+            description: story.description,
+            genre: story.genre,
+            cover: story.cover,
+            status: "PUBLISHED",
+            storyStatus: storyIndex === 4 ? "COMPLETED" : "ONGOING",
+            featured: storyIndex === 0,
+            updatedAt: new Date(Date.now() - storyIndex * 86400000),
+          },
         });
         for (const [chapterIndex, title] of story.titles.entries()) {
           const volumePosition =
             storyIndex === 0 ? Math.floor(chapterIndex / 4) + 1 : 1;
           const volumeId = `${story.id}-v${volumePosition}`;
-          await tx
-            .insert(volumes)
-            .values({
+          await tx.volume.createMany({
+            data: {
               id: volumeId,
               bookId: story.id,
               title:
@@ -206,8 +203,9 @@ try {
                     ][volumePosition - 1]
                   : "Birinci Cilt",
               position: volumePosition,
-            })
-            .onConflictDoNothing();
+            },
+            skipDuplicates: true,
+          });
           const content = {
             type: "doc",
             content: [
@@ -220,35 +218,41 @@ try {
               content: [{ type: "text", text }],
             })),
           };
-          await tx.insert(chapters).values({
-            id: `${story.id}-${chapterIndex + 1}`,
-            bookId: story.id,
-            volumeId,
-            title,
-            publishedTitle: title,
-            position:
-              storyIndex === 0 ? (chapterIndex % 4) + 1 : chapterIndex + 1,
-            content,
-            publishedContent: content,
-            wordCount: wordCount(content),
-            publishedWordCount: wordCount(content),
-            status: "PUBLISHED",
-            firstPublishedAt: new Date("2026-09-01T12:00:00Z"),
+          await tx.chapter.create({
+            data: {
+              id: `${story.id}-${chapterIndex + 1}`,
+              bookId: story.id,
+              volumeId,
+              title,
+              publishedTitle: title,
+              position:
+                storyIndex === 0 ? (chapterIndex % 4) + 1 : chapterIndex + 1,
+              content,
+              publishedContent: content,
+              wordCount: wordCount(content),
+              publishedWordCount: wordCount(content),
+              status: "PUBLISHED",
+              firstPublishedAt: new Date("2026-09-01T12:00:00Z"),
+            },
           });
         }
         for (let n = 0; n < 8; n++)
-          await tx.insert(ratings).values({
-            id: `${story.id}-rating-${n}`,
-            userId: `sample-reader-${n}`,
-            bookId: story.id,
-            score: n < 5 - (storyIndex % 3) ? 5 : 4,
+          await tx.rating.create({
+            data: {
+              id: `${story.id}-rating-${n}`,
+              userId: `sample-reader-${n}`,
+              bookId: story.id,
+              score: n < 5 - (storyIndex % 3) ? 5 : 4,
+            },
           });
       }
-      await tx.insert(comments).values({
-        id: "sample-comment-1",
-        userId: "sample-reader-0",
-        bookId: "kul-ve-yildiz",
-        body: "İlk bölümün atmosferi çok güzel. Haritanın sırrını öğrenmek için sabırsızlanıyorum.",
+      await tx.comment.create({
+        data: {
+          id: "sample-comment-1",
+          userId: "sample-reader-0",
+          bookId: "kul-ve-yildiz",
+          body: "İlk bölümün atmosferi çok güzel. Haritanın sırrını öğrenmek için sabırsızlanıyorum.",
+        },
       });
     });
     console.log(

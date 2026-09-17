@@ -1,9 +1,7 @@
 import Link from "next/link";
-import { and, eq } from "drizzle-orm";
 import { requireUser } from "@/lib/session";
 import { getLibrary } from "@/modules/catalog/queries";
 import { getDb } from "@/db";
-import { books, readingProgress } from "@/db/schema";
 import { BookCard } from "@/components/book-card";
 import { ArrowRight, Library } from "@/components/icons";
 export const metadata = { title: "Kütüphanem", robots: { index: false } };
@@ -11,17 +9,15 @@ export default async function MyLibrary() {
   const actor = await requireUser();
   const [saved, progress] = await Promise.all([
     getLibrary(actor.id),
-    getDb()
-      .select({ title: books.title, chapterId: readingProgress.chapterId })
-      .from(readingProgress)
-      .innerJoin(books, eq(books.id, readingProgress.bookId))
-      .where(
-        and(
-          eq(readingProgress.userId, actor.id),
-          eq(books.status, "PUBLISHED"),
-          eq(books.hidden, false),
-        ),
-      ),
+    getDb().readingProgress.findMany({
+      where: {
+        userId: actor.id,
+        book: { status: "PUBLISHED", hidden: false },
+        chapter: { status: "PUBLISHED", hidden: false },
+      },
+      select: { chapterId: true, book: { select: { title: true } } },
+      orderBy: { updatedAt: "desc" },
+    }),
   ]);
   return (
     <>
@@ -44,7 +40,7 @@ export default async function MyLibrary() {
               href={`/oku/${p.chapterId}`}
               key={p.chapterId}
             >
-              <span>{p.title} · Okumaya devam et</span>
+              <span>{p.book.title} · Okumaya devam et</span>
               <ArrowRight size={16} />
             </Link>
           ))}

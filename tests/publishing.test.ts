@@ -1,10 +1,13 @@
-import { beforeAll, afterAll, describe, expect, it } from "vitest";
+import { beforeAll, afterAll, describe, expect, it, vi } from "vitest";
 import { PGlite } from "@electric-sql/pglite";
-import { drizzle } from "drizzle-orm/pglite";
-import { migrate } from "drizzle-orm/pglite/migrator";
-import { eq } from "drizzle-orm";
-import * as schema from "@/db/schema";
-import type { Database } from "@/db";
+import type { ApplicationSnapshot } from "@/db/schema";
+import { migrateLocal } from "@/db/migrate-local";
+import { createLocalDatabase, getDb } from "@/db";
+import {
+  getCatalog,
+  getPublicBook,
+  getPublicChapters,
+} from "@/modules/catalog/queries";
 import {
   addChapter,
   addVolume,
@@ -21,9 +24,14 @@ import {
 } from "@/modules/publishing/policies";
 import { parseContent } from "@/modules/publishing/content";
 
+vi.mock("server-only", () => ({}));
+vi.mock("@/db", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/db")>()),
+  getDb: vi.fn(),
+}));
+
 const client = new PGlite();
-const nativeDb = drizzle(client, { schema });
-const db = nativeDb as unknown as Database;
+const { db, close } = createLocalDatabase(client);
 const writer = {
   id: "writer",
   name: "Yazar",
@@ -52,14 +60,15 @@ let bookId: string;
 let chapterId: string;
 let volumeId: string;
 beforeAll(async () => {
-  await migrate(nativeDb, { migrationsFolder: "./drizzle" });
+  vi.mocked(getDb).mockReturnValue(db);
+  await migrateLocal(client);
   for (const actor of [writer, admin, stranger])
-    await db
-      .insert(schema.user)
-      .values({ ...actor, email: `${actor.id}@example.test` });
+    await db.user.create({
+      data: { ...actor, email: `${actor.id}@example.test` },
+    });
 });
 afterAll(async () => {
-  await client.close();
+  await close();
 });
 
 describe("Yayın ve premium akışı — gerçek PostgreSQL motoru", () => {
@@ -71,18 +80,12 @@ describe("Yayın ve premium akışı — gerçek PostgreSQL motoru", () => {
       genre: "Fantastik",
       cover: "forest",
     });
-    const [chapter] = await db
-      .select()
-      .from(schema.chapters)
-      .where(eq(schema.chapters.bookId, bookId));
+    const [chapter] = await db.chapter.findMany({ where: { bookId: bookId } });
     chapterId = chapter.id;
     volumeId = chapter.volumeId;
     expect(chapter.status).toBe("DRAFT");
     expect(
-      await db
-        .select()
-        .from(schema.volumes)
-        .where(eq(schema.volumes.bookId, bookId)),
+      await db.volume.findMany({ where: { bookId: bookId } }),
     ).toHaveLength(1);
   });
   it("başka yazarın içeriği değiştirmesini ve doğrulanmamış yazarı engeller", async () => {
@@ -124,19 +127,10 @@ describe("Yayın ve premium akışı — gerçek PostgreSQL motoru", () => {
     await expect(
       submitApplication(db, writer, bookId, "PUBLICATION"),
     ).rejects.toMatchObject({ code: "ALREADY_PENDING" });
-    const [app] = await db
-      .select()
-      .from(schema.applications)
-      .where(eq(schema.applications.bookId, bookId));
-    expect(app.snapshot.chapters[0].version).toBe(2);
+    const [app] = await db.application.findMany({ where: { bookId: bookId } });
+    expect((app.snapshot as ApplicationSnapshot).chapters[0].version).toBe(2);
     await expect(
-      reviewApplication(
-        db,
-        { ...writer, role: "admin" },
-        app.id,
-        "APPROVED",
-        "Kendi onayım",
-      ),
+      reviewApplication(db, writer, app.id, "APPROVED", "Kendi onayım"),
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
     await reviewApplication(
       db,
@@ -145,20 +139,25 @@ describe("Yayın ve premium akışı — gerçek PostgreSQL motoru", () => {
       "APPROVED",
       "İçerik yayın için uygun.",
     );
+    expect(
+      await db.book.findUniqueOrThrow({ where: { id: bookId } }),
+    ).toMatchObject({ status: "PUBLISHED" });
+    expect(await getCatalog()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: bookId, chapterCount: 1 }),
+      ]),
+    );
+    expect(await getPublicChapters(bookId)).toHaveLength(1);
     await expect(
       reviewApplication(db, admin, app.id, "REJECTED", "İkinci karar"),
     ).rejects.toMatchObject({ code: "ALREADY_REVIEWED" });
   });
   it("ilk yayını açar ve premium öncesi bölümü ücretlendirmez", async () => {
-    await publishChapter(db, writer, chapterId, 2);
     await expect(
       setChapterPrice(db, writer, chapterId, 500),
     ).rejects.toMatchObject({ code: "PREMIUM_NOT_ACTIVE" });
     await submitApplication(db, writer, bookId, "PREMIUM");
-    const apps = await db
-      .select()
-      .from(schema.applications)
-      .where(eq(schema.applications.bookId, bookId));
+    const apps = await db.application.findMany({ where: { bookId: bookId } });
     const premium = apps.find((a) => a.type === "PREMIUM")!;
     await reviewApplication(
       db,
@@ -172,26 +171,17 @@ describe("Yayın ve premium akışı — gerçek PostgreSQL motoru", () => {
     ).rejects.toMatchObject({ code: "CHAPTER_PREDATES_PREMIUM" });
   });
   it("düzenleme ve yeniden yayın ilk yayın tarihini değiştirmez", async () => {
-    const [before] = await db
-      .select()
-      .from(schema.chapters)
-      .where(eq(schema.chapters.id, chapterId));
+    const [before] = await db.chapter.findMany({ where: { id: chapterId } });
     await saveChapter(db, writer, {
       chapterId,
       title: "Düzenlenen başlık",
       rawContent: content,
       expectedVersion: 2,
     });
-    const [draft] = await db
-      .select()
-      .from(schema.chapters)
-      .where(eq(schema.chapters.id, chapterId));
+    const [draft] = await db.chapter.findMany({ where: { id: chapterId } });
     expect(draft.publishedTitle).toBe("İlk Bölüm");
     await publishChapter(db, writer, chapterId, 3);
-    const [after] = await db
-      .select()
-      .from(schema.chapters)
-      .where(eq(schema.chapters.id, chapterId));
+    const [after] = await db.chapter.findMany({ where: { id: chapterId } });
     expect(after.firstPublishedAt).toEqual(before.firstPublishedAt);
     await expect(
       setChapterPrice(db, writer, chapterId, 500),
@@ -213,21 +203,12 @@ describe("Yayın ve premium akışı — gerçek PostgreSQL motoru", () => {
     });
     await publishChapter(db, writer, nextId, 2);
     await setChapterPrice(db, writer, nextId, 750);
-    const [book] = await db
-      .select()
-      .from(schema.books)
-      .where(eq(schema.books.id, bookId));
-    const [chapter] = await db
-      .select()
-      .from(schema.chapters)
-      .where(eq(schema.chapters.id, nextId));
+    const [book] = await db.book.findMany({ where: { id: bookId } });
+    const [chapter] = await db.chapter.findMany({ where: { id: nextId } });
     expect(chapter.priceMinor).toBe(750);
     expect(canReadPublic(book, chapter)).toBe(false);
     await setChapterPrice(db, writer, nextId, 0);
-    const [free] = await db
-      .select()
-      .from(schema.chapters)
-      .where(eq(schema.chapters.id, nextId));
+    const [free] = await db.chapter.findMany({ where: { id: nextId } });
     expect(canReadPublic(book, free)).toBe(true);
   });
   it("yabancı kitaba ait cilde bölüm eklenemez", async () => {
@@ -262,16 +243,16 @@ describe("Yayın ve premium akışı — gerçek PostgreSQL motoru", () => {
   });
   it("DB ilk yayın ve premium tarihinin doğrudan değiştirilmesini de engeller", async () => {
     await expect(
-      db
-        .update(schema.chapters)
-        .set({ firstPublishedAt: new Date() })
-        .where(eq(schema.chapters.id, chapterId)),
+      db.chapter.updateMany({
+        where: { id: chapterId },
+        data: { firstPublishedAt: new Date() },
+      }),
     ).rejects.toThrow();
     await expect(
-      db
-        .update(schema.books)
-        .set({ firstPremiumApprovedAt: null })
-        .where(eq(schema.books.id, bookId)),
+      db.book.updateMany({
+        where: { id: bookId },
+        data: { firstPremiumApprovedAt: null },
+      }),
     ).rejects.toThrow();
   });
   it("başvurudan sonra taslak değişse de ilk yayın yalnız incelenen metni açar", async () => {
@@ -282,10 +263,7 @@ describe("Yayın ve premium akışı — gerçek PostgreSQL motoru", () => {
       genre: "Gizem",
       cover: "ocean",
     });
-    const [draft] = await db
-      .select()
-      .from(schema.chapters)
-      .where(eq(schema.chapters.bookId, freshBook));
+    const [draft] = await db.chapter.findMany({ where: { bookId: freshBook } });
     await saveChapter(db, writer, {
       chapterId: draft.id,
       title: "İncelenen başlık",
@@ -300,11 +278,12 @@ describe("Yayın ve premium akışı — gerçek PostgreSQL motoru", () => {
       rawContent: changed,
       expectedVersion: 2,
     });
-    const [app] = await db
-      .select()
-      .from(schema.applications)
-      .where(eq(schema.applications.bookId, freshBook));
-    expect(app.snapshot.chapters[0].title).toBe("İncelenen başlık");
+    const [app] = await db.application.findMany({
+      where: { bookId: freshBook },
+    });
+    expect((app.snapshot as ApplicationSnapshot).chapters[0].title).toBe(
+      "İncelenen başlık",
+    );
     await reviewApplication(
       db,
       admin,
@@ -312,20 +291,279 @@ describe("Yayın ve premium akışı — gerçek PostgreSQL motoru", () => {
       "APPROVED",
       "İlk sürüm uygun bulundu.",
     );
-    await publishChapter(db, writer, draft.id, 3);
-    const [published] = await db
-      .select()
-      .from(schema.chapters)
-      .where(eq(schema.chapters.id, draft.id));
+    const [published] = await db.chapter.findMany({ where: { id: draft.id } });
     expect(published.publishedTitle).toBe("İncelenen başlık");
     expect(JSON.stringify(published.publishedContent)).not.toContain(
       "Onaylanmamış",
     );
     expect(JSON.stringify(published.content)).toContain("Onaylanmamış");
+    const publicBook = await getPublicBook(
+      (await db.book.findUniqueOrThrow({ where: { id: freshBook } })).slug,
+    );
+    expect(publicBook?.id).toBe(freshBook);
+    expect((await getPublicChapters(freshBook))[0].title).toBe(
+      "İncelenen başlık",
+    );
+  });
+});
+
+describe("Onayla otomatik yayın", () => {
+  it("yalnız incelenen bölümleri yayımlar; sonraki taslakları açmaz", async () => {
+    const freshBook = await createBook(db, writer, {
+      title: "Toplu İlk Yayın",
+      description:
+        "İncelenen bölümler ve daha sonra yazılan taslaklar ayrı tutulur.",
+      genre: "Fantastik",
+      cover: "forest",
+    });
+    const first = await db.chapter.findFirstOrThrow({
+      where: { bookId: freshBook },
+    });
+    const ids = [first.id];
+    for (let index = 2; index <= 4; index++)
+      ids.push(
+        await addChapter(
+          db,
+          writer,
+          freshBook,
+          first.volumeId,
+          `Bölüm ${index}`,
+        ),
+      );
+    for (const chapterId of ids)
+      await saveChapter(db, writer, {
+        chapterId,
+        title: "Örnek bölüm",
+        rawContent: content,
+        expectedVersion: 1,
+      });
+    await submitApplication(db, writer, freshBook, "PUBLICATION");
+    const app = await db.application.findFirstOrThrow({
+      where: { bookId: freshBook },
+    });
+    const reviewedIds = (app.snapshot as ApplicationSnapshot).chapters.map(
+      (c) => c.id,
+    );
+    await reviewApplication(
+      db,
+      admin,
+      app.id,
+      "APPROVED",
+      "İncelenen üç bölüm uygun.",
+    );
+    const published = await getPublicChapters(freshBook);
+    expect(published.map((c) => c.id).sort()).toEqual([...reviewedIds].sort());
+    const unreviewed = await db.chapter.findMany({
+      where: { bookId: freshBook, id: { notIn: reviewedIds } },
+    });
+    expect(unreviewed).toHaveLength(1);
+    expect(unreviewed[0]).toMatchObject({
+      status: "DRAFT",
+      publishedContent: null,
+      firstPublishedAt: null,
+    });
+    expect(
+      await db.auditLog.count({
+        where: { action: "chapter.published", targetId: { in: reviewedIds } },
+      }),
+    ).toBe(3);
+  });
+
+  it.each(["hidden", "missing"])(
+    "%s örnek bölüm varsa onayı ve yayını birlikte geri alır",
+    async (failure) => {
+      const freshBook = await createBook(db, writer, {
+        title: `Geçersiz Örnek ${failure}`,
+        description:
+          "İnceleme sonrasında kullanılamayan bir bölümün yayın kontrolü.",
+        genre: "Gizem",
+        cover: "ocean",
+      });
+      const first = await db.chapter.findFirstOrThrow({
+        where: { bookId: freshBook },
+      });
+      const second = await addChapter(
+        db,
+        writer,
+        freshBook,
+        first.volumeId,
+        "İkinci örnek",
+      );
+      for (const chapterId of [first.id, second])
+        await saveChapter(db, writer, {
+          chapterId,
+          title: "Örnek bölüm",
+          rawContent: content,
+          expectedVersion: 1,
+        });
+      await submitApplication(db, writer, freshBook, "PUBLICATION");
+      const app = await db.application.findFirstOrThrow({
+        where: { bookId: freshBook },
+      });
+      if (failure === "hidden")
+        await db.chapter.update({
+          where: { id: second },
+          data: { hidden: true },
+        });
+      else {
+        await db.chapterRevision.deleteMany({ where: { chapterId: second } });
+        await db.chapter.delete({ where: { id: second } });
+      }
+      await expect(
+        reviewApplication(db, admin, app.id, "APPROVED", "Örnekleri yayımla."),
+      ).rejects.toMatchObject({ code: "UNAVAILABLE" });
+      expect(
+        await db.book.findUniqueOrThrow({ where: { id: freshBook } }),
+      ).toMatchObject({ status: "DRAFT" });
+      expect(
+        await db.application.findUniqueOrThrow({ where: { id: app.id } }),
+      ).toMatchObject({ status: "PENDING", reviewerId: null });
+      expect(await getPublicChapters(freshBook)).toHaveLength(0);
+      expect(
+        await getPublicBook(
+          (await db.book.findUniqueOrThrow({ where: { id: freshBook } })).slug,
+        ),
+      ).toBeUndefined();
+      expect(
+        await db.auditLog.count({
+          where: { action: "chapter.published", targetId: first.id },
+        }),
+      ).toBe(0);
+    },
+  );
+});
+
+describe("Yöneticinin kendi kitabını değerlendirmesi", () => {
+  it.each([
+    ["PUBLICATION", "APPROVED"],
+    ["PUBLICATION", "REJECTED"],
+    ["PREMIUM", "APPROVED"],
+    ["PREMIUM", "REJECTED"],
+  ] as const)("%s başvurusunda %s kararı verir", async (type, decision) => {
+    const ownBookId = await createBook(db, admin, {
+      title: `Yönetici Kitabı ${type} ${decision}`,
+      description:
+        "Yöneticinin yazdığı kitabın yayın ve premium başvurusu örneği.",
+      genre: "Fantastik",
+      cover: "forest",
+    });
+    const chapter = await db.chapter.findFirstOrThrow({
+      where: { bookId: ownBookId },
+    });
+    await saveChapter(db, admin, {
+      chapterId: chapter.id,
+      title: "İlk bölüm",
+      rawContent: content,
+      expectedVersion: 1,
+    });
+    await submitApplication(db, admin, ownBookId, "PUBLICATION");
+    if (type === "PREMIUM") {
+      const publication = await db.application.findFirstOrThrow({
+        where: { bookId: ownBookId, type: "PUBLICATION" },
+      });
+      await reviewApplication(
+        db,
+        admin,
+        publication.id,
+        "APPROVED",
+        "Yayın için uygun.",
+      );
+      await submitApplication(db, admin, ownBookId, "PREMIUM");
+    }
+    const application = await db.application.findFirstOrThrow({
+      where: { bookId: ownBookId, type },
+    });
+    for (const actor of [writer, { ...admin, role: "reader" }]) {
+      await expect(
+        reviewApplication(
+          db,
+          actor,
+          application.id,
+          decision,
+          "Yetkisiz karar.",
+        ),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    }
+    await expect(
+      reviewApplication(
+        db,
+        { ...admin, emailVerified: false },
+        application.id,
+        decision,
+        "Doğrulanmamış hesap.",
+      ),
+    ).rejects.toMatchObject({ code: "EMAIL_UNVERIFIED" });
+    expect(
+      await db.application.findUniqueOrThrow({ where: { id: application.id } }),
+    ).toMatchObject({ status: "PENDING", reviewerId: null });
+    const note = "Yöneticinin kendi kitabı için inceleme kararı.";
+    await reviewApplication(db, admin, application.id, decision, note);
+    expect(
+      await db.application.findUniqueOrThrow({ where: { id: application.id } }),
+    ).toMatchObject({
+      status: decision,
+      reviewerId: admin.id,
+      reviewedAt: expect.any(Date),
+      note,
+    });
+    expect(
+      await db.auditLog.findFirstOrThrow({
+        where: { targetId: application.id },
+      }),
+    ).toMatchObject({
+      actorId: admin.id,
+      action: `application.${decision.toLowerCase()}`,
+      detail: note,
+    });
+    const book = await db.book.findUniqueOrThrow({ where: { id: ownBookId } });
+    expect(book.status).toBe(
+      type === "PREMIUM"
+        ? "PUBLISHED"
+        : decision === "APPROVED"
+          ? "PUBLISHED"
+          : "DRAFT",
+    );
+    expect(book.premiumStatus).toBe(
+      type === "PREMIUM" && decision === "APPROVED" ? "ACTIVE" : "NONE",
+    );
+    expect(book.firstPremiumApprovedAt).toEqual(
+      type === "PREMIUM" && decision === "APPROVED" ? expect.any(Date) : null,
+    );
+    await expect(
+      reviewApplication(db, admin, application.id, decision, note),
+    ).rejects.toMatchObject({ code: "ALREADY_REVIEWED" });
   });
 });
 
 describe("Güvenli içerik ve tarih sınırları", () => {
+  it("eski PostgreSQL kayıtlarının mikrosaniyeli ilk yayın tarihini aynen korur", async () => {
+    const migratedBook = await createBook(db, writer, {
+      title: "Eski Kayıt",
+      description:
+        "Eski veritabanından taşınmış bir kitabın mikrosaniye hassasiyetindeki tarih kaydı.",
+      genre: "Gizem",
+      cover: "ocean",
+    });
+    const chapter = await db.chapter.findFirstOrThrow({
+      where: { bookId: migratedBook },
+    });
+    await saveChapter(db, writer, {
+      chapterId: chapter.id,
+      title: "Eski bölüm",
+      rawContent: content,
+      expectedVersion: 1,
+    });
+    await db.book.update({
+      where: { id: migratedBook },
+      data: { status: "PUBLISHED" },
+    });
+    await db.$executeRaw`UPDATE chapters SET first_published_at = '2026-01-01 12:00:00.123456+00'::timestamptz WHERE id = ${chapter.id}`;
+    await publishChapter(db, writer, chapter.id, 2);
+    const [row] = await db.$queryRaw<
+      { stamp: string }[]
+    >`SELECT (first_published_at AT TIME ZONE 'UTC')::text AS stamp FROM chapters WHERE id = ${chapter.id}`;
+    expect(row.stamp).toContain("12:00:00.123456");
+  });
   it("eşit veya boş premium tarihi ücretli uygunluğu sağlamaz", () => {
     const at = new Date("2026-09-10T10:00:00Z");
     const book = {

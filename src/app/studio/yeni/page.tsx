@@ -52,7 +52,7 @@ export default async function NewBook() {
           </label>
           <fieldset style={{ border: 0, padding: 0 }}>
             <legend className="field" style={{ marginBottom: 14 }}>
-              Kapak rengi
+              Kapak illüstrasyonu
             </legend>
             <div className="cover-picker">
               {["ember", "ocean", "forest", "violet", "sand", "rose"].map(
@@ -65,12 +65,12 @@ export default async function NewBook() {
                       defaultChecked={i === 0}
                       aria-label={
                         [
-                          "Bakır",
-                          "Gece mavisi",
-                          "Orman yeşili",
-                          "Lavanta",
-                          "Kum",
-                          "Gül kurusu",
+                          "Kızıl kılıç",
+                          "Gökyüzü yolcusu",
+                          "Orman muhafızı",
+                          "Neon şehir",
+                          "Çöl gezgini",
+                          "Bahar hikâyesi",
                         ][i]
                       }
                     />

@@ -1,8 +1,7 @@
 import "server-only";
 import { betterAuth } from "better-auth";
-import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { prismaAdapter } from "better-auth/adapters/prisma";
 import { getDb } from "@/db";
-import * as schema from "@/db/schema";
 
 export function isLocalPreview() {
   const hostname = new URL(
@@ -44,7 +43,7 @@ function createAuth() {
     appName: "Satır",
     baseURL: process.env.BETTER_AUTH_URL,
     secret: process.env.BETTER_AUTH_SECRET,
-    database: drizzleAdapter(getDb(), { provider: "pg", schema }),
+    database: prismaAdapter(getDb(), { provider: "postgresql" }),
     user: {
       additionalFields: {
         role: { type: "string", defaultValue: "reader", input: false },

@@ -13,7 +13,7 @@ CREATE TABLE "account" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
---> statement-breakpoint
+
 CREATE TABLE "applications" (
 	"id" text PRIMARY KEY NOT NULL,
 	"book_id" text NOT NULL,
@@ -25,7 +25,7 @@ CREATE TABLE "applications" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"reviewed_at" timestamp with time zone
 );
---> statement-breakpoint
+
 CREATE TABLE "audit_logs" (
 	"id" text PRIMARY KEY NOT NULL,
 	"actor_id" text NOT NULL,
@@ -34,7 +34,7 @@ CREATE TABLE "audit_logs" (
 	"detail" text DEFAULT '' NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
---> statement-breakpoint
+
 CREATE TABLE "books" (
 	"id" text PRIMARY KEY NOT NULL,
 	"author_id" text NOT NULL,
@@ -54,7 +54,7 @@ CREATE TABLE "books" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "books_slug_unique" UNIQUE("slug")
 );
---> statement-breakpoint
+
 CREATE TABLE "chapter_revisions" (
 	"id" text PRIMARY KEY NOT NULL,
 	"chapter_id" text NOT NULL,
@@ -63,7 +63,7 @@ CREATE TABLE "chapter_revisions" (
 	"content" jsonb NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
---> statement-breakpoint
+
 CREATE TABLE "chapters" (
 	"id" text PRIMARY KEY NOT NULL,
 	"book_id" text NOT NULL,
@@ -86,7 +86,7 @@ CREATE TABLE "chapters" (
 	CONSTRAINT "chapter_price_valid" CHECK (("chapters"."access_type" = 'FREE' AND "chapters"."price_minor" = 0) OR ("chapters"."access_type" = 'PAID' AND "chapters"."price_minor" > 0)),
 	CONSTRAINT "published_requires_content" CHECK ("chapters"."status" <> 'PUBLISHED' OR ("chapters"."first_published_at" IS NOT NULL AND "chapters"."published_content" IS NOT NULL AND "chapters"."published_title" IS NOT NULL))
 );
---> statement-breakpoint
+
 CREATE TABLE "comments" (
 	"id" text PRIMARY KEY NOT NULL,
 	"user_id" text NOT NULL,
@@ -96,20 +96,20 @@ CREATE TABLE "comments" (
 	"hidden" boolean DEFAULT false NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
---> statement-breakpoint
+
 CREATE TABLE "library_entries" (
 	"id" text PRIMARY KEY NOT NULL,
 	"user_id" text NOT NULL,
 	"book_id" text NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
---> statement-breakpoint
+
 CREATE TABLE "rate_limits" (
 	"key" text PRIMARY KEY NOT NULL,
 	"count" integer DEFAULT 1 NOT NULL,
 	"window_start" timestamp with time zone DEFAULT now() NOT NULL
 );
---> statement-breakpoint
+
 CREATE TABLE "ratings" (
 	"id" text PRIMARY KEY NOT NULL,
 	"user_id" text NOT NULL,
@@ -118,7 +118,7 @@ CREATE TABLE "ratings" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "rating_score_range" CHECK ("ratings"."score" BETWEEN 1 AND 5)
 );
---> statement-breakpoint
+
 CREATE TABLE "reading_progress" (
 	"id" text PRIMARY KEY NOT NULL,
 	"user_id" text NOT NULL,
@@ -126,7 +126,7 @@ CREATE TABLE "reading_progress" (
 	"chapter_id" text NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
---> statement-breakpoint
+
 CREATE TABLE "session" (
 	"id" text PRIMARY KEY NOT NULL,
 	"expires_at" timestamp with time zone NOT NULL,
@@ -138,7 +138,7 @@ CREATE TABLE "session" (
 	"user_id" text NOT NULL,
 	CONSTRAINT "session_token_unique" UNIQUE("token")
 );
---> statement-breakpoint
+
 CREATE TABLE "user" (
 	"id" text PRIMARY KEY NOT NULL,
 	"name" text NOT NULL,
@@ -150,7 +150,7 @@ CREATE TABLE "user" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "user_email_unique" UNIQUE("email")
 );
---> statement-breakpoint
+
 CREATE TABLE "verification" (
 	"id" text PRIMARY KEY NOT NULL,
 	"identifier" text NOT NULL,
@@ -159,7 +159,7 @@ CREATE TABLE "verification" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
---> statement-breakpoint
+
 CREATE TABLE "volumes" (
 	"id" text PRIMARY KEY NOT NULL,
 	"book_id" text NOT NULL,
@@ -167,32 +167,32 @@ CREATE TABLE "volumes" (
 	"position" integer NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
---> statement-breakpoint
-ALTER TABLE "account" ADD CONSTRAINT "account_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "applications" ADD CONSTRAINT "applications_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "applications" ADD CONSTRAINT "applications_reviewer_id_user_id_fk" FOREIGN KEY ("reviewer_id") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "audit_logs" ADD CONSTRAINT "audit_logs_actor_id_user_id_fk" FOREIGN KEY ("actor_id") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "books" ADD CONSTRAINT "books_author_id_user_id_fk" FOREIGN KEY ("author_id") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "chapter_revisions" ADD CONSTRAINT "chapter_revisions_chapter_id_chapters_id_fk" FOREIGN KEY ("chapter_id") REFERENCES "public"."chapters"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "chapters" ADD CONSTRAINT "chapters_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "chapters" ADD CONSTRAINT "chapters_volume_id_volumes_id_fk" FOREIGN KEY ("volume_id") REFERENCES "public"."volumes"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "comments" ADD CONSTRAINT "comments_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "comments" ADD CONSTRAINT "comments_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "library_entries" ADD CONSTRAINT "library_entries_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "library_entries" ADD CONSTRAINT "library_entries_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "ratings" ADD CONSTRAINT "ratings_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "ratings" ADD CONSTRAINT "ratings_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "reading_progress" ADD CONSTRAINT "reading_progress_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "reading_progress" ADD CONSTRAINT "reading_progress_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "reading_progress" ADD CONSTRAINT "reading_progress_chapter_id_chapters_id_fk" FOREIGN KEY ("chapter_id") REFERENCES "public"."chapters"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "session" ADD CONSTRAINT "session_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "volumes" ADD CONSTRAINT "volumes_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-CREATE UNIQUE INDEX "one_pending_application_idx" ON "applications" USING btree ("book_id","type") WHERE "applications"."status" = 'PENDING';--> statement-breakpoint
-CREATE INDEX "books_catalog_idx" ON "books" USING btree ("status","hidden","updated_at");--> statement-breakpoint
-CREATE UNIQUE INDEX "revision_version_idx" ON "chapter_revisions" USING btree ("chapter_id","version");--> statement-breakpoint
-CREATE UNIQUE INDEX "chapters_position_idx" ON "chapters" USING btree ("volume_id","position");--> statement-breakpoint
-CREATE INDEX "chapters_book_idx" ON "chapters" USING btree ("book_id","status");--> statement-breakpoint
-CREATE UNIQUE INDEX "library_user_book_idx" ON "library_entries" USING btree ("user_id","book_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "rating_user_book_idx" ON "ratings" USING btree ("user_id","book_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "progress_user_book_idx" ON "reading_progress" USING btree ("user_id","book_id");--> statement-breakpoint
+
+ALTER TABLE "account" ADD CONSTRAINT "account_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;
+ALTER TABLE "applications" ADD CONSTRAINT "applications_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "applications" ADD CONSTRAINT "applications_reviewer_id_user_id_fk" FOREIGN KEY ("reviewer_id") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "audit_logs" ADD CONSTRAINT "audit_logs_actor_id_user_id_fk" FOREIGN KEY ("actor_id") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "books" ADD CONSTRAINT "books_author_id_user_id_fk" FOREIGN KEY ("author_id") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "chapter_revisions" ADD CONSTRAINT "chapter_revisions_chapter_id_chapters_id_fk" FOREIGN KEY ("chapter_id") REFERENCES "public"."chapters"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "chapters" ADD CONSTRAINT "chapters_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "chapters" ADD CONSTRAINT "chapters_volume_id_volumes_id_fk" FOREIGN KEY ("volume_id") REFERENCES "public"."volumes"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "comments" ADD CONSTRAINT "comments_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "comments" ADD CONSTRAINT "comments_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "library_entries" ADD CONSTRAINT "library_entries_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "library_entries" ADD CONSTRAINT "library_entries_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "ratings" ADD CONSTRAINT "ratings_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "ratings" ADD CONSTRAINT "ratings_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "reading_progress" ADD CONSTRAINT "reading_progress_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "reading_progress" ADD CONSTRAINT "reading_progress_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "reading_progress" ADD CONSTRAINT "reading_progress_chapter_id_chapters_id_fk" FOREIGN KEY ("chapter_id") REFERENCES "public"."chapters"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "session" ADD CONSTRAINT "session_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;
+ALTER TABLE "volumes" ADD CONSTRAINT "volumes_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "public"."books"("id") ON DELETE no action ON UPDATE no action;
+CREATE UNIQUE INDEX "one_pending_application_idx" ON "applications" USING btree ("book_id","type") WHERE "applications"."status" = 'PENDING';
+CREATE INDEX "books_catalog_idx" ON "books" USING btree ("status","hidden","updated_at");
+CREATE UNIQUE INDEX "revision_version_idx" ON "chapter_revisions" USING btree ("chapter_id","version");
+CREATE UNIQUE INDEX "chapters_position_idx" ON "chapters" USING btree ("volume_id","position");
+CREATE INDEX "chapters_book_idx" ON "chapters" USING btree ("book_id","status");
+CREATE UNIQUE INDEX "library_user_book_idx" ON "library_entries" USING btree ("user_id","book_id");
+CREATE UNIQUE INDEX "rating_user_book_idx" ON "ratings" USING btree ("user_id","book_id");
+CREATE UNIQUE INDEX "progress_user_book_idx" ON "reading_progress" USING btree ("user_id","book_id");
 CREATE UNIQUE INDEX "volumes_position_idx" ON "volumes" USING btree ("book_id","position");

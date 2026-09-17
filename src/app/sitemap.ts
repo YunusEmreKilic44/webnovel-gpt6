@@ -1,15 +1,13 @@
 import type { MetadataRoute } from "next";
-import { and, eq } from "drizzle-orm";
 import { getDb } from "@/db";
-import { books } from "@/db/schema";
 export const dynamic = "force-dynamic";
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const origin = process.env.BETTER_AUTH_URL || "http://localhost:3000";
-  const published = await getDb()
-    .select({ slug: books.slug, updatedAt: books.updatedAt })
-    .from(books)
-    .where(and(eq(books.status, "PUBLISHED"), eq(books.hidden, false)))
-    .limit(49000);
+  const published = await getDb().book.findMany({
+    where: { status: "PUBLISHED", hidden: false },
+    select: { slug: true, updatedAt: true },
+    take: 49000,
+  });
   return [
     { url: origin, changeFrequency: "daily", priority: 1 },
     { url: `${origin}/kesfet`, changeFrequency: "daily", priority: 0.8 },

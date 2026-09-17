@@ -1,8 +1,8 @@
-node_modules
-.next
-.data
-test-results
-playwright-report
-drizzle
+src/generated/
+.next/
+.data/
+node_modules/
 package-lock.json
+test-results/
+playwright-report/
 next-env.d.ts

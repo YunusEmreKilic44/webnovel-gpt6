@@ -1,8 +1,7 @@
-import { and, eq } from "drizzle-orm";
+import type { JSONContent } from "@tiptap/react";
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { getDb } from "@/db";
-import { books, chapters, user } from "@/db/schema";
 import { getCurrentUser } from "@/lib/session";
 import { canReadPublic } from "@/modules/publishing/policies";
 import { getPublicChapters } from "@/modules/catalog/queries";
@@ -21,31 +20,41 @@ export default async function ReadChapter({
   const { chapterId } = await params;
   const db = getDb();
   // First query contains no body. Authorization must precede fetching content.
-  const [entry] = await db
-    .select({
-      chapter: {
-        id: chapters.id,
-        title: chapters.publishedTitle,
-        bookId: chapters.bookId,
-        status: chapters.status,
-        hidden: chapters.hidden,
-        accessType: chapters.accessType,
-        price: chapters.priceMinor,
-        wordCount: chapters.publishedWordCount,
-      },
+  const chapter = await db.chapter.findUnique({
+    where: { id: chapterId },
+    select: {
+      id: true,
+      publishedTitle: true,
+      bookId: true,
+      status: true,
+      hidden: true,
+      accessType: true,
+      priceMinor: true,
+      publishedWordCount: true,
       book: {
-        id: books.id,
-        title: books.title,
-        slug: books.slug,
-        status: books.status,
-        hidden: books.hidden,
+        select: {
+          id: true,
+          title: true,
+          slug: true,
+          status: true,
+          hidden: true,
+          author: { select: { name: true } },
+        },
       },
-      author: user.name,
-    })
-    .from(chapters)
-    .innerJoin(books, eq(books.id, chapters.bookId))
-    .innerJoin(user, eq(user.id, books.authorId))
-    .where(eq(chapters.id, chapterId));
+    },
+  });
+  const entry = chapter
+    ? {
+        chapter: {
+          ...chapter,
+          title: chapter.publishedTitle,
+          price: chapter.priceMinor,
+          wordCount: chapter.publishedWordCount,
+        },
+        book: chapter.book,
+        author: chapter.book.author.name,
+      }
+    : null;
   if (
     !entry ||
     entry.book.hidden ||
@@ -64,25 +73,21 @@ export default async function ReadChapter({
   if (!metadata) notFound();
   let content = null;
   if (canReadPublic(entry.book, entry.chapter)) {
-    const [body] = await db
-      .select({ content: chapters.publishedContent })
-      .from(chapters)
-      .innerJoin(books, eq(books.id, chapters.bookId))
-      .where(
-        and(
-          eq(chapters.id, chapterId),
-          eq(chapters.accessType, "FREE"),
-          eq(chapters.status, "PUBLISHED"),
-          eq(chapters.hidden, false),
-          eq(books.status, "PUBLISHED"),
-          eq(books.hidden, false),
-        ),
-      );
-    content = body?.content ?? null;
+    const body = await db.chapter.findFirst({
+      where: {
+        id: chapterId,
+        accessType: "FREE",
+        status: "PUBLISHED",
+        hidden: false,
+        book: { status: "PUBLISHED", hidden: false },
+      },
+      select: { publishedContent: true },
+    });
+    content = (body?.publishedContent as JSONContent | null) ?? null;
   }
   const storedTheme = cookieStore.get("reader-theme")?.value;
   const theme =
-    storedTheme === "dark" || storedTheme === "sepia" ? storedTheme : "paper";
+    storedTheme === "paper" || storedTheme === "sepia" ? storedTheme : "dark";
   const font = Number(cookieStore.get("reader-font")?.value || 20);
   return (
     <Reader

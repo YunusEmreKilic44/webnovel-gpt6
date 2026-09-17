@@ -1,8 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
-import { applications, books, chapters, volumes } from "@/db/schema";
 import { requireUser } from "@/lib/session";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import {
@@ -27,40 +25,35 @@ export default async function StudioBook({
   const actor = await requireUser();
   const { bookId } = await params;
   const db = getDb();
-  const [book] = await db
-    .select()
-    .from(books)
-    .where(and(eq(books.id, bookId), eq(books.authorId, actor.id)));
+  const book = await db.book.findFirst({
+    where: { id: bookId, authorId: actor.id },
+  });
   if (!book) notFound();
   const [allVolumes, allChapters, history] = await Promise.all([
-    db
-      .select()
-      .from(volumes)
-      .where(eq(volumes.bookId, bookId))
-      .orderBy(volumes.position),
-    db
-      .select({
-        id: chapters.id,
-        title: chapters.title,
-        volumeId: chapters.volumeId,
-        position: chapters.position,
-        status: chapters.status,
-        wordCount: chapters.wordCount,
-      })
-      .from(chapters)
-      .where(eq(chapters.bookId, bookId))
-      .orderBy(chapters.position),
-    db
-      .select({
-        id: applications.id,
-        type: applications.type,
-        status: applications.status,
-        note: applications.note,
-        createdAt: applications.createdAt,
-      })
-      .from(applications)
-      .where(eq(applications.bookId, bookId))
-      .orderBy(desc(applications.createdAt)),
+    db.volume.findMany({ where: { bookId }, orderBy: { position: "asc" } }),
+    db.chapter.findMany({
+      where: { bookId },
+      select: {
+        id: true,
+        title: true,
+        volumeId: true,
+        position: true,
+        status: true,
+        wordCount: true,
+      },
+      orderBy: { position: "asc" },
+    }),
+    db.application.findMany({
+      where: { bookId },
+      select: {
+        id: true,
+        type: true,
+        status: true,
+        note: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+    }),
   ]);
   const publicationPending = history.some(
     (a) => a.type === "PUBLICATION" && a.status === "PENDING",

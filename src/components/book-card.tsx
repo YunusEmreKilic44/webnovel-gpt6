@@ -13,12 +13,14 @@ export function BookCard({ book }: { book: CatalogBook }) {
           author={book.author}
           subtitle={book.subtitle}
         />
-        {book.storyStatus === "COMPLETED" && (
-          <span className="cover-label">Tamamlandı</span>
-        )}
-        {book.premiumStatus === "ACTIVE" && (
-          <span className="cover-label">Premium</span>
-        )}
+        <div className="cover-labels">
+          {book.storyStatus === "COMPLETED" && (
+            <span className="cover-label">Tamamlandı</span>
+          )}
+          {book.premiumStatus === "ACTIVE" && (
+            <span className="cover-label">Premium</span>
+          )}
+        </div>
       </div>
       <div className="book-card-genre">{book.genre}</div>
       <h3>{book.title}</h3>

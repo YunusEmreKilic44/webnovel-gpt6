@@ -1,17 +1,7 @@
 "use server";
-import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/db";
-import {
-  books,
-  comments,
-  libraryEntries,
-  ratings,
-  rateLimits,
-  readingProgress,
-  chapters,
-} from "@/db/schema";
 import { getCurrentUser } from "@/lib/session";
 import {
   canReadPublic,
@@ -32,48 +22,33 @@ export async function interactAction(
       .enum(["save", "unsave", "rate", "comment", "progress"])
       .parse(form.get("intent"));
     const db = getDb();
-    const [book] = await db
-      .select()
-      .from(books)
-      .where(
-        and(
-          eq(books.id, bookId),
-          eq(books.status, "PUBLISHED"),
-          eq(books.hidden, false),
-        ),
-      );
+    const book = await db.book.findFirst({
+      where: { id: bookId, status: "PUBLISHED", hidden: false },
+    });
     if (!book) throw new DomainError("NOT_FOUND", "Kitap bulunamadı.");
     if (["rate", "comment"].includes(intent)) requireVerified(actor);
-    const [limit] = await db
-      .insert(rateLimits)
-      .values({ key: `${actor.id}:${intent}`, count: 1 })
-      .onConflictDoUpdate({
-        target: rateLimits.key,
-        set: {
-          count: sql`CASE WHEN ${rateLimits.windowStart} < now() - interval '1 minute' THEN 1 ELSE ${rateLimits.count} + 1 END`,
-          windowStart: sql`CASE WHEN ${rateLimits.windowStart} < now() - interval '1 minute' THEN now() ELSE ${rateLimits.windowStart} END`,
-        },
-      })
-      .returning();
+    // Keep the rate-limit increment atomic across concurrent requests.
+    const [limit] = await db.$queryRaw<{ count: number }[]>`
+      INSERT INTO rate_limits (key, count) VALUES (${actor.id + ":" + intent}, 1)
+      ON CONFLICT (key) DO UPDATE SET
+        count = CASE WHEN rate_limits.window_start < now() - interval '1 minute' THEN 1 ELSE rate_limits.count + 1 END,
+        window_start = CASE WHEN rate_limits.window_start < now() - interval '1 minute' THEN now() ELSE rate_limits.window_start END
+      RETURNING count
+    `;
     if (limit.count > (intent === "comment" ? 5 : 40))
       throw new DomainError(
         "RATE_LIMIT",
         "Biraz hızlı ilerliyorsun. Bir dakika sonra tekrar dene.",
       );
+    const userId_bookId = { userId: actor.id, bookId };
     if (intent === "save")
-      await db
-        .insert(libraryEntries)
-        .values({ id: crypto.randomUUID(), userId: actor.id, bookId })
-        .onConflictDoNothing();
+      await db.libraryEntry.upsert({
+        where: { userId_bookId },
+        create: { id: crypto.randomUUID(), ...userId_bookId },
+        update: {},
+      });
     if (intent === "unsave")
-      await db
-        .delete(libraryEntries)
-        .where(
-          and(
-            eq(libraryEntries.userId, actor.id),
-            eq(libraryEntries.bookId, bookId),
-          ),
-        );
+      await db.libraryEntry.deleteMany({ where: userId_bookId });
     if (intent === "rate") {
       if (book.authorId === actor.id)
         throw new DomainError("SELF_RATING", "Kendi kitabına puan veremezsin.");
@@ -83,13 +58,11 @@ export async function interactAction(
         .min(1)
         .max(5)
         .parse(form.get("score"));
-      await db
-        .insert(ratings)
-        .values({ id: crypto.randomUUID(), userId: actor.id, bookId, score })
-        .onConflictDoUpdate({
-          target: [ratings.userId, ratings.bookId],
-          set: { score },
-        });
+      await db.rating.upsert({
+        where: { userId_bookId },
+        create: { id: crypto.randomUUID(), ...userId_bookId, score },
+        update: { score },
+      });
     }
     if (intent === "comment") {
       const body = z
@@ -98,38 +71,28 @@ export async function interactAction(
         .min(3, "Yorum en az 3 karakter olmalı.")
         .max(2000)
         .parse(form.get("body"));
-      await db.insert(comments).values({
-        id: crypto.randomUUID(),
-        userId: actor.id,
-        bookId,
-        body,
-        spoiler: form.get("spoiler") === "on",
+      await db.comment.create({
+        data: {
+          id: crypto.randomUUID(),
+          ...userId_bookId,
+          body,
+          spoiler: form.get("spoiler") === "on",
+        },
       });
     }
     if (intent === "progress") {
       const chapterId = String(form.get("chapterId"));
-      const [chapter] = await db
-        .select({
-          status: chapters.status,
-          hidden: chapters.hidden,
-          accessType: chapters.accessType,
-        })
-        .from(chapters)
-        .where(and(eq(chapters.id, chapterId), eq(chapters.bookId, bookId)));
+      const chapter = await db.chapter.findFirst({
+        where: { id: chapterId, bookId },
+        select: { status: true, hidden: true, accessType: true },
+      });
       if (!chapter || !canReadPublic(book, chapter))
         throw new DomainError("FORBIDDEN", "Bu bölüme erişimin yok.");
-      await db
-        .insert(readingProgress)
-        .values({
-          id: crypto.randomUUID(),
-          userId: actor.id,
-          bookId,
-          chapterId,
-        })
-        .onConflictDoUpdate({
-          target: [readingProgress.userId, readingProgress.bookId],
-          set: { chapterId, updatedAt: new Date() },
-        });
+      await db.readingProgress.upsert({
+        where: { userId_bookId },
+        create: { id: crypto.randomUUID(), ...userId_bookId, chapterId },
+        update: { chapterId, updatedAt: new Date() },
+      });
     }
     revalidatePath("/", "layout");
     const messages = {

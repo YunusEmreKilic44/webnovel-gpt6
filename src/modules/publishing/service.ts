@@ -1,15 +1,8 @@
-import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
+import type { JSONContent } from "@tiptap/react";
 import type { Database } from "@/db";
-import {
-  applications,
-  auditLogs,
-  books,
-  chapterRevisions,
-  chapters,
-  volumes,
-  type Actor,
-} from "@/db/schema";
+import type { Prisma } from "@/generated/prisma/client";
+import type { Actor, ApplicationSnapshot } from "@/db/schema";
 import { emptyContent, parseContent, wordCount } from "./content";
 import {
   DomainError,
@@ -47,6 +40,31 @@ const titleInput = z
   .min(2, "Başlık en az 2 karakter olmalı.")
   .max(120);
 const id = () => crypto.randomUUID();
+const json = (value: JSONContent | ApplicationSnapshot) =>
+  value as Prisma.InputJsonValue;
+type Transaction = Prisma.TransactionClient;
+
+// All publishing mutations acquire the book lock first, including revision writes.
+async function lockBook(tx: Transaction, bookId: string) {
+  await tx.$queryRaw`SELECT id FROM books WHERE id = ${bookId} FOR UPDATE`;
+  const book = await tx.book.findUnique({ where: { id: bookId } });
+  if (!book) throw new DomainError("NOT_FOUND", "Kitap bulunamadı.");
+  return book;
+}
+async function chapterBook(tx: Transaction, chapterId: string) {
+  const reference = await tx.chapter.findUnique({
+    where: { id: chapterId },
+    select: { bookId: true },
+  });
+  if (!reference) throw new DomainError("NOT_FOUND", "Bölüm bulunamadı.");
+  return lockBook(tx, reference.bookId);
+}
+async function databaseTime(tx: Transaction) {
+  const [row] = await tx.$queryRaw<
+    { at: Date }[]
+  >`SELECT clock_timestamp() AS at`;
+  return row.at;
+}
 
 export async function createBook(
   db: Database,
@@ -56,30 +74,36 @@ export async function createBook(
   requireVerified(actor);
   const data = bookInput.parse(input);
   const bookId = id();
-  await db.transaction(async (tx) => {
-    await tx.insert(books).values({
-      id: bookId,
-      authorId: actor.id,
-      ...data,
-      slug: `${slugify(data.title)}-${bookId.slice(0, 8)}`,
+  await db.$transaction(async (tx) => {
+    await tx.book.create({
+      data: {
+        id: bookId,
+        authorId: actor.id,
+        ...data,
+        slug: `${slugify(data.title)}-${bookId.slice(0, 8)}`,
+      },
     });
     const volumeId = id();
-    await tx
-      .insert(volumes)
-      .values({ id: volumeId, bookId, title: "Birinci Cilt", position: 1 });
-    await tx.insert(chapters).values({
-      id: id(),
-      bookId,
-      volumeId,
-      title: "İlk Bölüm",
-      position: 1,
-      content: emptyContent,
+    await tx.volume.create({
+      data: { id: volumeId, bookId, title: "Birinci Cilt", position: 1 },
     });
-    await tx.insert(auditLogs).values({
-      id: id(),
-      actorId: actor.id,
-      targetId: bookId,
-      action: "book.created",
+    await tx.chapter.create({
+      data: {
+        id: id(),
+        bookId,
+        volumeId,
+        title: "İlk Bölüm",
+        position: 1,
+        content: json(emptyContent),
+      },
+    });
+    await tx.auditLog.create({
+      data: {
+        id: id(),
+        actorId: actor.id,
+        targetId: bookId,
+        action: "book.created",
+      },
     });
   });
   return bookId;
@@ -93,23 +117,20 @@ export async function addVolume(
 ) {
   requireVerified(actor);
   const name = titleInput.parse(title);
-  await db.transaction(async (tx) => {
-    const [book] = await tx
-      .select()
-      .from(books)
-      .where(eq(books.id, bookId))
-      .for("update");
-    if (!book) throw new DomainError("NOT_FOUND", "Kitap bulunamadı.");
+  await db.$transaction(async (tx) => {
+    const book = await lockBook(tx, bookId);
     requireOwner(actor, book);
-    const existing = await tx
-      .select({ position: volumes.position })
-      .from(volumes)
-      .where(eq(volumes.bookId, bookId));
-    await tx.insert(volumes).values({
-      id: id(),
-      bookId,
-      title: name,
-      position: Math.max(0, ...existing.map((v) => v.position)) + 1,
+    const last = await tx.volume.aggregate({
+      where: { bookId },
+      _max: { position: true },
+    });
+    await tx.volume.create({
+      data: {
+        id: id(),
+        bookId,
+        title: name,
+        position: (last._max.position ?? 0) + 1,
+      },
     });
   });
 }
@@ -123,31 +144,27 @@ export async function addChapter(
   requireVerified(actor);
   const name = titleInput.parse(title);
   const chapterId = id();
-  await db.transaction(async (tx) => {
-    const [book] = await tx
-      .select()
-      .from(books)
-      .where(eq(books.id, bookId))
-      .for("update");
-    if (!book) throw new DomainError("NOT_FOUND", "Kitap bulunamadı.");
+  await db.$transaction(async (tx) => {
+    const book = await lockBook(tx, bookId);
     requireOwner(actor, book);
-    const [volume] = await tx
-      .select()
-      .from(volumes)
-      .where(and(eq(volumes.id, volumeId), eq(volumes.bookId, bookId)));
+    const volume = await tx.volume.findFirst({
+      where: { id: volumeId, bookId },
+    });
     if (!volume)
       throw new DomainError("NOT_FOUND", "Cilt bu kitaba ait değil.");
-    const existing = await tx
-      .select({ position: chapters.position })
-      .from(chapters)
-      .where(eq(chapters.volumeId, volumeId));
-    await tx.insert(chapters).values({
-      id: chapterId,
-      bookId,
-      volumeId,
-      title: name,
-      position: Math.max(0, ...existing.map((c) => c.position)) + 1,
-      content: emptyContent,
+    const last = await tx.chapter.aggregate({
+      where: { volumeId },
+      _max: { position: true },
+    });
+    await tx.chapter.create({
+      data: {
+        id: chapterId,
+        bookId,
+        volumeId,
+        title: name,
+        position: (last._max.position ?? 0) + 1,
+        content: json(emptyContent),
+      },
     });
   });
   return chapterId;
@@ -165,46 +182,33 @@ export async function saveChapter(
   requireVerified(actor);
   const title = titleInput.parse(input.title);
   const content = parseContent(input.rawContent);
-  return db.transaction(async (tx) => {
-    const [chapter] = await tx
-      .select()
-      .from(chapters)
-      .where(eq(chapters.id, input.chapterId));
-    if (!chapter) throw new DomainError("NOT_FOUND", "Bölüm bulunamadı.");
-    const [book] = await tx
-      .select()
-      .from(books)
-      .where(eq(books.id, chapter.bookId))
-      .for("update");
+  return db.$transaction(async (tx) => {
+    const book = await chapterBook(tx, input.chapterId);
     requireOwner(actor, book);
     const nextVersion = input.expectedVersion + 1;
-    const updated = await tx
-      .update(chapters)
-      .set({
+    const updated = await tx.chapter.updateMany({
+      where: { id: input.chapterId, version: input.expectedVersion },
+      data: {
         title,
-        content,
+        content: json(content),
         wordCount: wordCount(content),
         version: nextVersion,
         updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(chapters.id, chapter.id),
-          eq(chapters.version, input.expectedVersion),
-        ),
-      )
-      .returning({ version: chapters.version });
-    if (!updated.length)
+      },
+    });
+    if (!updated.count)
       throw new DomainError(
         "REVISION_CONFLICT",
         "Bu bölüm başka bir sekmede değiştirildi. Metnini kopyalayıp sayfayı yenile.",
       );
-    await tx.insert(chapterRevisions).values({
-      id: id(),
-      chapterId: chapter.id,
-      title,
-      content,
-      version: nextVersion,
+    await tx.chapterRevision.create({
+      data: {
+        id: id(),
+        chapterId: input.chapterId,
+        title,
+        content: json(content),
+        version: nextVersion,
+      },
     });
     return nextVersion;
   });
@@ -218,13 +222,8 @@ export async function submitApplication(
 ) {
   requireVerified(actor);
   z.enum(["PUBLICATION", "PREMIUM"]).parse(type);
-  await db.transaction(async (tx) => {
-    const [book] = await tx
-      .select()
-      .from(books)
-      .where(eq(books.id, bookId))
-      .for("update");
-    if (!book) throw new DomainError("NOT_FOUND", "Kitap bulunamadı.");
+  await db.$transaction(async (tx) => {
+    const book = await lockBook(tx, bookId);
     requireOwner(actor, book);
     if (book.hidden || book.status === "ARCHIVED")
       throw new DomainError("UNAVAILABLE", "Bu kitap için başvuru yapılamaz.");
@@ -241,55 +240,50 @@ export async function submitApplication(
         "NOT_ELIGIBLE",
         "Premium başvurusu için kitabın yayında olmalı ve aktif premium yetkisi bulunmamalı.",
       );
-    const pending = await tx
-      .select({ id: applications.id })
-      .from(applications)
-      .where(
-        and(
-          eq(applications.bookId, bookId),
-          eq(applications.type, type),
-          eq(applications.status, "PENDING"),
-        ),
-      );
-    if (pending.length)
+    if (
+      await tx.application.count({ where: { bookId, type, status: "PENDING" } })
+    )
       throw new DomainError(
         "ALREADY_PENDING",
         "Bu türde bir başvurun zaten inceleniyor.",
       );
-    const samples = await tx
-      .select()
-      .from(chapters)
-      .where(eq(chapters.bookId, bookId))
-      .orderBy(chapters.createdAt);
+    const samples = await tx.chapter.findMany({
+      where: { bookId },
+      orderBy: { createdAt: "asc" },
+    });
     const complete = samples
-      .filter((c) => wordCount(c.content) >= 30)
+      .filter((c) => wordCount(c.content as JSONContent) >= 30)
       .slice(0, 3);
     if (!complete.length)
       throw new DomainError(
         "SAMPLE_REQUIRED",
         "En az 30 kelimelik bir örnek bölüm kaydetmelisin.",
       );
-    await tx.insert(applications).values({
-      id: id(),
-      bookId,
-      type,
-      snapshot: {
-        title: book.title,
-        description: book.description,
-        genre: book.genre,
-        chapters: complete.map((c) => ({
-          id: c.id,
-          title: c.title,
-          version: c.version,
-          content: c.content,
-        })),
+    await tx.application.create({
+      data: {
+        id: id(),
+        bookId,
+        type,
+        snapshot: json({
+          title: book.title,
+          description: book.description,
+          genre: book.genre,
+          chapters: complete.map((c) => ({
+            id: c.id,
+            title: c.title,
+            version: c.version,
+            content: c.content as JSONContent,
+          })),
+        }),
       },
     });
-    await tx.insert(auditLogs).values({
-      id: id(),
-      actorId: actor.id,
-      targetId: bookId,
-      action: `application.${type.toLowerCase()}.submitted`,
+    await tx.auditLog.create({
+      data: {
+        id: id(),
+        actorId: actor.id,
+        targetId: bookId,
+        action: `application.${type.toLowerCase()}.submitted`,
+      },
     });
   });
 }
@@ -308,23 +302,17 @@ export async function reviewApplication(
     .min(5, "En az 5 karakterlik bir karar notu ekle.")
     .max(2000)
     .parse(note);
-  await db.transaction(async (tx) => {
-    const [reference] = await tx
-      .select({ bookId: applications.bookId })
-      .from(applications)
-      .where(eq(applications.id, applicationId));
+  await db.$transaction(async (tx) => {
+    const reference = await tx.application.findUnique({
+      where: { id: applicationId },
+      select: { bookId: true },
+    });
     if (!reference) throw new DomainError("NOT_FOUND", "Başvuru bulunamadı.");
-    const [book] = await tx
-      .select()
-      .from(books)
-      .where(eq(books.id, reference.bookId))
-      .for("update");
-    requireReviewer(actor, book);
-    const [application] = await tx
-      .select()
-      .from(applications)
-      .where(eq(applications.id, applicationId))
-      .for("update");
+    const book = await lockBook(tx, reference.bookId);
+    requireReviewer(actor);
+    const application = await tx.application.findUniqueOrThrow({
+      where: { id: applicationId },
+    });
     if (application.status !== "PENDING")
       throw new DomainError(
         "ALREADY_REVIEWED",
@@ -339,39 +327,82 @@ export async function reviewApplication(
       if (application.type === "PUBLICATION") {
         if (book.status !== "DRAFT")
           throw new DomainError("CONFLICT", "Kitabın durumu değişmiş.");
-        await tx
-          .update(books)
-          .set({ status: "APPROVED", updatedAt: new Date() })
-          .where(eq(books.id, book.id));
+        const samples = (application.snapshot as ApplicationSnapshot).chapters;
+        const chapters = await tx.chapter.findMany({
+          where: { bookId: book.id, id: { in: samples.map((c) => c.id) } },
+        });
+        if (
+          !samples.length ||
+          chapters.length !== samples.length ||
+          chapters.some((c) => c.hidden || c.status !== "DRAFT")
+        )
+          throw new DomainError(
+            "UNAVAILABLE",
+            "İncelenen bölümler artık yayın için uygun değil.",
+          );
+        const publishedAt = await databaseTime(tx);
+        // Publish the reviewed snapshot, leaving newer author drafts untouched.
+        for (const sample of samples) {
+          const chapter = chapters.find((c) => c.id === sample.id)!;
+          await tx.chapter.update({
+            where: { id: chapter.id },
+            data: {
+              status: "PUBLISHED",
+              publishedContent: json(sample.content),
+              publishedTitle: sample.title,
+              publishedWordCount: wordCount(sample.content),
+              ...(chapter.firstPublishedAt
+                ? {}
+                : { firstPublishedAt: publishedAt }),
+              updatedAt: publishedAt,
+            },
+          });
+          await tx.auditLog.create({
+            data: {
+              id: id(),
+              actorId: actor.id,
+              targetId: chapter.id,
+              action: "chapter.published",
+              detail: `publication.approved:${application.id}`,
+            },
+          });
+        }
+        await tx.book.update({
+          where: { id: book.id },
+          data: { status: "PUBLISHED", updatedAt: publishedAt },
+        });
       } else {
         if (book.status !== "PUBLISHED")
           throw new DomainError("NOT_PUBLISHED", "Kitap yayında olmalı.");
-        await tx
-          .update(books)
-          .set({
+        await tx.book.update({
+          where: { id: book.id },
+          data: {
             premiumStatus: "ACTIVE",
-            firstPremiumApprovedAt:
-              book.firstPremiumApprovedAt ?? sql`clock_timestamp()`,
+            ...(book.firstPremiumApprovedAt
+              ? {}
+              : { firstPremiumApprovedAt: await databaseTime(tx) }),
             updatedAt: new Date(),
-          })
-          .where(eq(books.id, book.id));
+          },
+        });
       }
     }
-    await tx
-      .update(applications)
-      .set({
+    await tx.application.update({
+      where: { id: applicationId },
+      data: {
         status: decision,
         note: reason,
         reviewerId: actor.id,
         reviewedAt: new Date(),
-      })
-      .where(eq(applications.id, application.id));
-    await tx.insert(auditLogs).values({
-      id: id(),
-      actorId: actor.id,
-      targetId: application.id,
-      action: `application.${decision.toLowerCase()}`,
-      detail: reason,
+      },
+    });
+    await tx.auditLog.create({
+      data: {
+        id: id(),
+        actorId: actor.id,
+        targetId: applicationId,
+        action: `application.${decision.toLowerCase()}`,
+        detail: reason,
+      },
     });
   });
 }
@@ -383,34 +414,26 @@ export async function publishChapter(
   expectedVersion: number,
 ) {
   requireVerified(actor);
-  await db.transaction(async (tx) => {
-    const [reference] = await tx
-      .select({ bookId: chapters.bookId })
-      .from(chapters)
-      .where(eq(chapters.id, chapterId));
-    if (!reference) throw new DomainError("NOT_FOUND", "Bölüm bulunamadı.");
-    const [book] = await tx
-      .select()
-      .from(books)
-      .where(eq(books.id, reference.bookId))
-      .for("update");
+  await db.$transaction(async (tx) => {
+    const book = await chapterBook(tx, chapterId);
     requireOwner(actor, book);
     if (!["APPROVED", "PUBLISHED"].includes(book.status) || book.hidden)
       throw new DomainError(
         "NOT_APPROVED",
         "Kitabın yayın başvurusu henüz onaylanmadı.",
       );
-    const [chapter] = await tx
-      .select()
-      .from(chapters)
-      .where(eq(chapters.id, chapterId))
-      .for("update");
+    const chapter = await tx.chapter.findUniqueOrThrow({
+      where: { id: chapterId },
+    });
     if (chapter.version !== expectedVersion)
       throw new DomainError(
         "REVISION_CONFLICT",
         "Bölüm değişti. Sayfayı yenileyip tekrar dene.",
       );
-    if (book.status === "PUBLISHED" && wordCount(chapter.content) < 30)
+    if (
+      book.status === "PUBLISHED" &&
+      wordCount(chapter.content as JSONContent) < 30
+    )
       throw new DomainError(
         "TOO_SHORT",
         "Yayınlamak için en az 30 kelime yazmalısın.",
@@ -419,22 +442,15 @@ export async function publishChapter(
       throw new DomainError("HIDDEN", "Gizlenmiş bölüm yayımlanamaz.");
     let publication = {
       title: chapter.title,
-      content: chapter.content,
+      content: chapter.content as JSONContent,
       wordCount: chapter.wordCount,
     };
     if (book.status === "APPROVED") {
-      const approved = await tx
-        .select()
-        .from(applications)
-        .where(
-          and(
-            eq(applications.bookId, book.id),
-            eq(applications.type, "PUBLICATION"),
-            eq(applications.status, "APPROVED"),
-          ),
-        );
+      const approved = await tx.application.findMany({
+        where: { bookId: book.id, type: "PUBLICATION", status: "APPROVED" },
+      });
       const reviewed = approved
-        .flatMap((a) => a.snapshot.chapters)
+        .flatMap((a) => (a.snapshot as ApplicationSnapshot).chapters)
         .find((c) => c.id === chapter.id);
       if (!reviewed)
         throw new DomainError(
@@ -447,26 +463,30 @@ export async function publishChapter(
         wordCount: wordCount(reviewed.content),
       };
     }
-    await tx
-      .update(chapters)
-      .set({
+    await tx.chapter.update({
+      where: { id: chapterId },
+      data: {
         status: "PUBLISHED",
-        publishedContent: publication.content,
+        publishedContent: json(publication.content),
         publishedTitle: publication.title,
         publishedWordCount: publication.wordCount,
-        firstPublishedAt: chapter.firstPublishedAt ?? sql`clock_timestamp()`,
+        ...(chapter.firstPublishedAt
+          ? {}
+          : { firstPublishedAt: await databaseTime(tx) }),
         updatedAt: new Date(),
-      })
-      .where(eq(chapters.id, chapterId));
-    await tx
-      .update(books)
-      .set({ status: "PUBLISHED", updatedAt: new Date() })
-      .where(eq(books.id, book.id));
-    await tx.insert(auditLogs).values({
-      id: id(),
-      actorId: actor.id,
-      targetId: chapterId,
-      action: "chapter.published",
+      },
+    });
+    await tx.book.update({
+      where: { id: book.id },
+      data: { status: "PUBLISHED", updatedAt: new Date() },
+    });
+    await tx.auditLog.create({
+      data: {
+        id: id(),
+        actorId: actor.id,
+        targetId: chapterId,
+        action: "chapter.published",
+      },
     });
   });
 }
@@ -479,34 +499,25 @@ export async function setChapterPrice(
 ) {
   requireVerified(actor);
   z.number().int().min(0).max(100_000).parse(priceMinor);
-  await db.transaction(async (tx) => {
-    const [reference] = await tx
-      .select({ bookId: chapters.bookId })
-      .from(chapters)
-      .where(eq(chapters.id, chapterId));
-    if (!reference) throw new DomainError("NOT_FOUND", "Bölüm bulunamadı.");
-    const [book] = await tx
-      .select()
-      .from(books)
-      .where(eq(books.id, reference.bookId))
-      .for("update");
+  await db.$transaction(async (tx) => {
+    const book = await chapterBook(tx, chapterId);
     requireOwner(actor, book);
-    const [chapter] = await tx
-      .select()
-      .from(chapters)
-      .where(eq(chapters.id, chapterId))
-      .for("update");
+    const chapter = await tx.chapter.findUniqueOrThrow({
+      where: { id: chapterId },
+    });
     if (priceMinor > 0) requirePaidEligibility(book, chapter);
-    await tx
-      .update(chapters)
-      .set({ accessType: priceMinor > 0 ? "PAID" : "FREE", priceMinor })
-      .where(eq(chapters.id, chapterId));
-    await tx.insert(auditLogs).values({
-      id: id(),
-      actorId: actor.id,
-      targetId: chapterId,
-      action: "chapter.price_changed",
-      detail: String(priceMinor),
+    await tx.chapter.update({
+      where: { id: chapterId },
+      data: { accessType: priceMinor > 0 ? "PAID" : "FREE", priceMinor },
+    });
+    await tx.auditLog.create({
+      data: {
+        id: id(),
+        actorId: actor.id,
+        targetId: chapterId,
+        action: "chapter.price_changed",
+        detail: String(priceMinor),
+      },
     });
   });
 }

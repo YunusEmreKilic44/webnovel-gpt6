@@ -1,11 +1,9 @@
 import Link from "next/link";
-import { desc, eq, sql } from "drizzle-orm";
 import { getDb } from "@/db";
-import { books } from "@/db/schema";
 import { requireUser } from "@/lib/session";
 import { BookCover } from "@/components/book-cover";
 import { ChevronRight, Feather, Plus } from "@/components/icons";
-const labels = {
+const labels: Record<string, string> = {
   DRAFT: "Taslak",
   APPROVED: "Yayın onaylandı",
   PUBLISHED: "Yayında",
@@ -13,14 +11,15 @@ const labels = {
 };
 export default async function Studio() {
   const actor = await requireUser();
-  const myBooks = await getDb()
-    .select({
-      book: books,
-      count: sql<number>`(select count(*)::int from chapters c where c.book_id = ${books.id})`,
-    })
-    .from(books)
-    .where(eq(books.authorId, actor.id))
-    .orderBy(desc(books.updatedAt));
+  const rows = await getDb().book.findMany({
+    where: { authorId: actor.id },
+    include: { _count: { select: { chapters: true } } },
+    orderBy: { updatedAt: "desc" },
+  });
+  const myBooks = rows.map(({ _count, ...book }) => ({
+    book,
+    count: _count.chapters,
+  }));
   return (
     <>
       <div className="studio-heading">

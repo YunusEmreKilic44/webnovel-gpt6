@@ -1,10 +1,28 @@
 # Webnovel Platformu — Ürün Gereksinimleri ve Teknik Mimari
 
-Tarih: 16 Eylül 2026  
-Durum: Uygulamaya temel olacak mimari tasarım  
-Kapsam: Ürün kuralları, teknoloji seçimi, veri modeli, uygulama sınırları, ödeme, güvenlik ve geliştirme planı.
+Son güncelleme: 17 Eylül 2026
 
-Bu doküman platformun hedef mimarisini tanımlar. İlk çalışan uygulama ve veritabanı migration'ları geliştirilmiştir; gerçek ödeme entegrasyonu henüz yoktur. Tamamlanan özellikler, kurulum ve mevcut sınırlar [README.md](./README.md) içinde izlenir. Kullanıcının istediği temel kurallar aşağıda korunmuştur; belirtilmeyen davranışlar **önerilen ürün kararı** olarak tasarlanmıştır.
+Durum: Anime/manga arayüzü ve Prisma geçişi tamamlanmış çalışan sürüm; sonraki aşamalar için hedef mimari
+
+Kapsam: Mevcut uygulama, ürün kuralları, teknoloji seçimi, veri modeli, uygulama sınırları ve geliştirme planı.
+
+Bu doküman çalışan sürümü ve platformun hedef mimarisini birlikte tanımlar. Kullanıcının isteği doğrultusunda arayüz anime/manga odaklı bir webnovel deneyimine dönüştürülmüş, veri erişimi Drizzle'dan Prisma 7'ye taşınmıştır. Kurulum komutları ve kullanım akışları [README.md](./README.md) içindedir. Aşağıdaki mevcut durum tablosunda bulunmayan ödeme, worker, dosya yükleme ve gelişmiş moderasyon özellikleri hedef kapsamdır; uygulanmış özellik olarak değerlendirilmemelidir.
+
+### Mevcut durum
+
+| Alan | 17 Eylül 2026 itibarıyla çalışan kapsam |
+| --- | --- |
+| Arayüz | Koyu zemin, kırmızı vurgu, anime seri vitrini, altı seçilebilir illüstrasyon, yatay gezinme ve mobil menü. |
+| Keşif ve okuma | Başlık/yazar araması, tür ve tamamlanma filtresi, puan sıralaması, kitap/cilt/bölüm ekranları, tema ve yazı boyutu tercihleri. |
+| Kimlik | Better Auth ve Prisma adaptörü; kayıt, giriş, çıkış, veritabanı oturumları, doğrulama ve şifre yenileme için Resend bağlantısı. |
+| Yazarlık | Kitap/cilt/bölüm oluşturma, Tiptap editörü, otomatik kayıt, sürüm çakışması kontrolü, taslak/canlı metin ayrımı. |
+| İnceleme | Yayın ve premium başvuru anlık görüntüleri, yönetici onay/red işlemleri ve denetim kayıtları. |
+| Topluluk | Kütüphane, bölüm bazlı okuma ilerlemesi, kitap puanı, kitap yorumu ve spoiler gizleme. |
+| Veritabanı | Prisma Client; PostgreSQL için `@prisma/adapter-pg`, yerel PGlite için `pglite-prisma-adapter`; mevcut verileri koruyan migration geçişi. |
+| Premium | Onay ve bölüm fiyatlandırması; eski ücretsiz bölümleri koruyan kurallar. Tahsilat ve satın alınmış erişim henüz yok. |
+| Doğrulama | 24 iş kuralı/migration testi, TypeScript ve ESLint başarılı. Önceki UI/Prisma kontrolünde 3 Playwright testi ve üretim derlemesi başarılıydı; yönetici öz değerlendirme ve otomatik yayın değişiklikleri için tam paket yeniden çalıştırılmadı. DB testleri yerel PGlite üzerinde çalıştırıldı. |
+
+Mevcut kullanıcı rolleri `reader` ve `admin` değerleridir; yazarlık kitap sahipliğiyle belirlenir. Aşağıdaki ayrıntılı rol, ödeme ve operasyon bölümleri ileride uygulanacak daha geniş modeli de içerir. Belirtilmeyen ürün davranışları **önerilen ürün kararı** olarak tasarlanmıştır.
 
 ## 1. Ürün ve başlangıç kararları
 
@@ -45,7 +63,7 @@ Roller bir kullanıcıda birleşebilir. İçerik sahipliği, rol kontrolüne ek 
 | İçerik gizleme, şikâyet inceleme | Hayır | Hayır | Şikâyet edebilir | Evet | Evet |
 | İade ve gelir işlemleri | Hayır | Kendi talebi | Kendi raporu | Hayır | `finance.manage` yetkisiyle |
 
-Moderatör veya yönetici, kendisine ait kitabın başvurusunu değerlendiremez. Ücretli metne personel erişimi genel rol ayrıcalığı değildir; atanmış inceleme veya destek görevi gerektirir ve kaydedilir. Yönetici hesaplarında iki aşamalı doğrulama zorunludur.
+Çalışan sürümde e-postası doğrulanmış yönetici, kendi kitabı dahil yayın ve premium başvurularını onaylayabilir veya reddedebilir. Karar gerekçesi, değerlendiren yönetici ve işlem kaydı saklanır; normal kullanıcılar değerlendirme yapamaz. Hedef moderatör rolü kendi kitabının başvurusunu değerlendiremez. Ücretli metne personel erişimi genel rol ayrıcalığı değildir; atanmış inceleme veya destek görevi gerektirir ve kaydedilir. Yönetici hesaplarında iki aşamalı doğrulama zorunludur.
 
 ## 3. Okuyucu, yazar ve yönetim özellikleri
 
@@ -89,6 +107,20 @@ Moderatör veya yönetici, kendisine ait kitabın başvurusunu değerlendiremez.
 - Yorumlar kitap veya bölüm kapsamındadır. Bölüm yorumlarını okuma/yazma, ilgili bölüme erişim kontrolünden geçer; ücretli bölüm tartışmaları metni dolaylı olarak ifşa etmez.
 - İlk sürüm bir seviye yanıtı destekler. Düzenlenmiş yorum etiketi, spoiler gizleme, hız sınırı ve moderasyon kaydı bulunur.
 
+### 3.5. Uygulanan anime/manga tasarımı
+
+Satır, metin tabanlı bir webnovel platformudur; anime/manga yönü görsel kimliği tanımlar. Manga sayfası yükleme veya çizgi roman panel okuyucusu bu sürümün parçası değildir.
+
+- Ana sayfada tam genişlikte anime illüstrasyonu üzerinde öne çıkan serinin adı, özeti, yazarı, puanı ve okuma bağlantısı bulunur.
+- Tür gezinmesini altı kitaplık seri rafı, son güncellenenler ve değerlendirme puanlarından hesaplanan sıralama izler.
+- Masaüstünde yatay gezinme; mobilde açılır menü, arama ve iki sütunlu kitap rafı kullanılır. Mobil menü Escape ile kapanır ve klavye odağını menü düğmesine geri verir.
+- Kitap detayları, hesap ekranları, yazar stüdyosu ve başvuru ekranları aynı koyu tema ve kırmızı vurgu dilini kullanır. Stüdyo formları ve editör içerik odaklı tutulur.
+- Okuyucu varsayılan olarak koyu açılır; açık ve sepya temalar ile 16–28 piksel yazı boyutu tercihi çerezde saklanır. Bölüm içeriği serif yazı tipiyle, arayüz sans-serif yazı tipiyle gösterilir.
+- `public/art/hero.png` seri vitrini için; `ember`, `ocean`, `forest`, `violet`, `sand` ve `rose` kapakları kitap görselleri için kullanılır. Bunlar dosya yükleme özelliği değil, yazarın seçebildiği yerel illüstrasyonlardır.
+- Kapaklar `BookCover` üzerinden Next.js Image ile sunulur. Üretim yöntemi ve promptlar [ARTWORK.md](./public/art/ARTWORK.md) içinde kayıtlıdır.
+
+Ana uygulama dosyaları: [globals.css](./src/app/globals.css), [shell.tsx](./src/components/shell.tsx), [page.tsx](./src/app/page.tsx), [book-cover.tsx](./src/components/book-cover.tsx) ve [reader.tsx](./src/components/reader.tsx).
+
 ## 4. Yayın ve premium iş akışları
 
 ### 4.1. Kitabın ilk yayın başvurusu
@@ -98,12 +130,12 @@ Moderatör veya yönetici, kendisine ait kitabın başvurusunu değerlendiremez.
 3. Başvuru gönderilirken kitap bilgileri ve incelenecek bölüm sürümleri bir başvuru anlık görüntüsüne bağlanır.
 4. Yazar taslakları düzenlemeyi sürdürebilir; bu değişiklikler bekleyen başvuruya sessizce eklenmez. Başvuru geri çekilip yeni sürümle tekrar gönderilebilir.
 5. Moderatör onaylar, düzeltme ister veya gerekçeyle reddeder.
-6. Onaylanan kitap `APPROVED` olur. Yazar incelenmiş ilk sürümü yayımladığında kitap `PUBLISHED` olur. İlk yayın, başvuruda onaylanan kitap/bölüm sürümlerini esas alır.
+6. Yönetici **Onayla ve yayımla** kararı verdiğinde kitap doğrudan `PUBLISHED` olur. Başvuru anlık görüntüsündeki en fazla üç örnek bölüm, incelenen başlık ve metinleriyle aynı transaction içinde yayımlanır; kitap kataloğa girer. Sonradan değişen taslaklar ve örnek dışındaki bölümler otomatik açılmaz. Gizlenmiş veya silinmiş örnek bölüm varsa karar ve yayın birlikte geri alınır. Her bölüm yayını ve başvuru kararı işlem kaydına yazılır.
 7. Sonraki bölümler yazar tarafından yayımlanabilir. Kitabın temel konusu, hak sahipliği veya yaş sınıfını değiştiren güncellemeler yeniden incelemeye gider; karar verilene kadar mevcut onaylı profil gösterilir.
 
 Başvuru durumları: `PENDING → IN_REVIEW → APPROVED | CHANGES_REQUESTED | REJECTED`; karar öncesi `WITHDRAWN` mümkündür. Yeniden başvuru eski kaydı değiştirmez, yeni bir kayıt üretir. Kitap başına aynı türde tek açık başvuru bulunur.
 
-Kitabın yayın durumu: `DRAFT → APPROVED → PUBLISHED → ARCHIVED`. Moderasyon durumu ayrıca `CLEAR | HIDDEN` olarak tutulur. Hikâyenin yazım durumu da ayrı bir alandır: `ONGOING | COMPLETED | HIATUS | DROPPED`.
+Kitabın yayın durumu: `DRAFT → PUBLISHED → ARCHIVED`; yayın başvurusu onayı ilk yayını da gerçekleştirir. Önceki akıştan kalan `APPROVED` kitaplar editörden incelenen bölüm yayımlanarak `PUBLISHED` yapılabilir. Moderasyon durumu ayrıca `CLEAR | HIDDEN` olarak tutulur. Hikâyenin yazım durumu da ayrı bir alandır: `ONGOING | COMPLETED | HIATUS | DROPPED`.
 
 `ARCHIVED`, yeni keşif ve satışı durdurur. Önceden satın alanların erişimi korunur. `HIDDEN`, içerik ihlali nedeniyle okuyucu erişimini de engeller; varsa iade incelemesi başlatılır. Böylece hikâyenin bitmesi, satışın durması ve içeriğin kaldırılması birbirine karışmaz.
 
@@ -172,34 +204,56 @@ Bölüm yayın durumu `DRAFT | SCHEDULED | PUBLISHED` olarak tutulur. Daha önce
 
 ## 5. Teknoloji seçimi
 
-Sürüm politikası: Kurulum tarihinde güvenlik güncellemeleri alınmış, birbiriyle uyumlu kararlı sürümler seçilir; paketler `pnpm-lock.yaml`, Node sürümü ve container etiketiyle sabitlenir. Bu dokümandaki seçimler belirli bir sürüm numarasının sonsuza kadar güncel kalacağını varsaymaz.
+Sürüm politikası: Proje npm kullanır; bağımlılıklar `package-lock.json` ile sabitlenir ve `npm ci` ile kurulur. Çalışan sürüm Next.js 16, React 19, TypeScript ve Prisma 7 kullanır; Node.js 22.17+ gerekir. Kesin paket sürümleri için `package.json` ve kilit dosyası esas alınır. Aşağıdaki tablo çalışan teknolojileri ve ayrıca belirtilen hedef servisleri kapsar.
 
 | Katman | Seçim | Neden / sorumluluk |
 | --- | --- | --- |
 | Web ve sunucu | Next.js App Router + React + TypeScript, Node.js runtime | SEO, okuyucu ekranları, paneller ve sunucu işlemleri aynı uygulamada. |
-| Arayüz | Tailwind CSS + shadcn/ui | Tutarlı form/panel bileşenleri ve okunabilir mobil tasarım. |
+| Arayüz | Tailwind CSS altyapısı + global CSS + özel React bileşenleri + Lucide | Anime/manga görsel kimliği, paylaşılan formlar, okuyucu ve mobil gezinme. shadcn/ui kullanılmıyor. |
 | Doğrulama | Zod | Sunucuda komut ve form doğrulaması; istemci kontrolleri yalnızca kullanıcı deneyimi içindir. |
 | Kimlik | Better Auth + veritabanı oturumları | E-posta/parola, doğrulama, parola sıfırlama; ileride sosyal giriş. |
 | Veritabanı | PostgreSQL | İlişkiler, transaction, benzersizlik ve finans kayıtları. |
-| Veri erişimi | Drizzle ORM + Drizzle Kit + `pg` | TypeScript şeması, kontrollü SQL migration'ları ve açık transaction sınırları. |
+| Veri erişimi | Prisma ORM + Prisma Migrate + `@prisma/adapter-pg` | Prisma şeması, tip güvenli istemci, kontrollü SQL migration'ları ve açık transaction sınırları. |
 | Editör | Tiptap'ın açık kaynak çekirdeği | Yapılandırılmış metin; ilk sürümde ortak canlı düzenleme gerekmez. |
-| İş kuyruğu | pg-boss + ayrı Node.js worker | Zamanlanmış yayın, e-posta, mutabakat ve yeniden deneme. |
-| Dosyalar | Cloudflare R2 | Kapak/avatar nesneleri; bölüm metni PostgreSQL'de kalır. |
-| E-posta | Resend, `EmailProvider` adaptörü arkasında | Hesap ve uygulama bildirimlerini iş kuyruğundan gönderme. |
+| İş kuyruğu | Hedef: pg-boss + ayrı Node.js worker | Zamanlanmış yayın, e-posta, mutabakat ve yeniden deneme; henüz uygulanmadı. |
+| Dosyalar | Mevcut: `public/art/`; hedef: Cloudflare R2 | Yerel anime illüstrasyonları mevcut; kapak/avatar yükleme henüz yok. Bölüm metni veritabanında kalır. |
+| E-posta | Mevcut: doğrudan Resend API; hedef: `EmailProvider` ve kuyruk | Hesap doğrulama ve şifre yenileme bağlantıları mevcut; kalıcı teslim kuyruğu henüz yok. |
 | Ödeme | Türkiye varsayımında iyzico Pazaryeri, `PaymentProvider` adaptörü arkasında | Tahsilat ve yazara gelir aktarımı için pazaryeri modeli. Ticari uygunluk ayrıca doğrulanır. |
-| Arama | PostgreSQL `pg_trgm` + filtre indeksleri | İlk sürümde başlık/yazar araması; ayrı arama servisi gerektirmez. |
-| Test | Vitest + gerçek PostgreSQL üzerinde entegrasyon + Playwright | İş kuralları, yarış koşulları ve tarayıcı akışları. |
+| Arama | Mevcut: parametreli `ILIKE`; hedef: `pg_trgm` indeksleri | Başlık/yazar araması, filtreler ve puan sıralaması; ayrı arama servisi yok. |
+| Test | Vitest + PGlite üzerinde Prisma entegrasyonu + Playwright | İş kuralları, migration, yarış koşulları ve tarayıcı akışları; ayrı PostgreSQL sunucusunda doğrulama sonraki dağıtım kontrolüdür. |
 | Çalıştırma | Docker, yönetilen container barındırma, yönetilen PostgreSQL | Web ve worker için ayrı süreç, ortak sürümlenmiş kod. |
 | CI | GitHub Actions | Tip/lint/test/build ve kontrollü migration/deploy. |
 | Gözlemleme | Yapılandırılmış JSON logları, OpenTelemetry, hata takip adaptörü | İstek/iş/ödeme kimliğiyle hata ve gecikme takibi. |
 
-Better Auth'ın Next.js ve Drizzle entegrasyonları vardır; kimlik ve oturum yönetimi kütüphaneye, kitap sahipliği ve premium kuralları uygulamanın servislerine aittir. Kaynaklar: [Next.js entegrasyonu](https://better-auth.com/docs/integrations/next), [Drizzle adaptörü](https://better-auth.com/docs/adapters/drizzle).
+Better Auth'ın Next.js ve Prisma entegrasyonları vardır; kimlik ve oturum yönetimi kütüphaneye, kitap sahipliği ve premium kuralları uygulamanın servislerine aittir. Kaynaklar: [Next.js entegrasyonu](https://better-auth.com/docs/integrations/next), [Prisma adaptörü](https://better-auth.com/docs/adapters/prisma).
 
-Drizzle transaction desteği, birlikte başarılı olması gereken yayın, hak ve finans değişikliklerini tek işlemde tutmak için kullanılacaktır. [Drizzle transaction dokümanı](https://orm.drizzle.team/docs/transactions).
+Yayın servisleri Prisma interactive transaction desteğini kullanır. Yayın, başvuru kararı, bölüm sürümü ve fiyat değişiklikleri kitap satırını `SELECT ... FOR UPDATE` ile kilitler; yetki kontrolü ve yazma aynı işlem içinde yapılır. Gelecekteki hak ve finans değişiklikleri de bu transaction yaklaşımını izler. [Prisma transaction dokümanı](https://www.prisma.io/docs/orm/prisma-client/queries/transactions).
 
 pg-boss, PostgreSQL üzerinde iş kuyruğu ve zamanlama sağlar. Bu tasarımda ilk aşamada Redis/BullMQ gerekmiyor; buna rağmen işleyiciler tekrar çalışmaya dayanıklı yazılır. [pg-boss deposu](https://github.com/timgit/pg-boss).
 
 Tiptap içeriği JSON olarak saklanır; yalnız izinli düğüm ve işaretler render edilir. [Tiptap çıktı biçimleri](https://tiptap.dev/docs/guides/output-json-html). R2'ye yükleme için kısa süreli imzalı URL kullanılabilir; yayımlanmamış dosyalar özel tutulur. [R2 imzalı URL dokümanı](https://developers.cloudflare.com/r2/api/s3/presigned-urls/). E-posta adaptörü Next.js uyumlu Resend API'sini kullanır. [Resend entegrasyonu](https://resend.com/docs/send-with-nextjs).
+
+### 5.1. Prisma şeması ve migration akışı
+
+- Tek şema kaynağı [prisma/schema.prisma](./prisma/schema.prisma) dosyasıdır. `@map` ve `@@map`, mevcut PostgreSQL tablo/kolon adlarını korur; geçiş tablo yeniden oluşturmayı gerektirmez.
+- Prisma Client `src/generated/prisma/` içine üretilir ve sürüm kontrolüne alınmaz. `npm ci` sonrasında ve üretim derlemesinden önce otomatik üretilir; elle üretim komutu `npm run db:generate` şeklindedir.
+- [src/db/index.ts](./src/db/index.ts), yeniden kullanılan Prisma istemcisini oluşturur. `DATABASE_URL` varsa PostgreSQL adaptörü; yoksa yalnız `LOCAL_DATABASE=true` koşulunda yerel PGlite adaptörü seçilir.
+- Better Auth `prismaAdapter(..., { provider: "postgresql" })` kullanır. Oturum, katalog, topluluk, yayın, seed ve yönetici komutları Prisma'ya taşınmıştır. Drizzle paketleri ve eski şema/config dosyaları kaldırılmıştır.
+- Katalog istatistikleri, satır kilitleri ve atomik hız sınırı gibi SQL gerektiren işlemler Prisma'nın parametreli SQL API'sini kullanır; kullanıcı girdisi SQL metnine birleştirilmez.
+
+| Komut | İşlev |
+| --- | --- |
+| `npm run db:generate` | Şemadan Prisma Client üretir; migration oluşturmaz. |
+| `npm run db:dev -- --name degisiklik_adi` | PostgreSQL geliştirme veritabanında Prisma Migrate ile yeni migration oluşturur ve uygular. |
+| `npm run db:migrate` | Kontrol edilmiş SQL migration'larını seçili ortama uygular; PostgreSQL'de `prisma migrate deploy` çağırır. |
+| `npm run db:seed` | Kitap bulunmayan veritabanına örnek içerik ekler. |
+| `npm run db:admin -- kayitli@adres.com` | Var olan, doğrulanmış kullanıcıya yönetici rolü verir. |
+
+PGlite, Prisma CLI için ağ üzerinden PostgreSQL bağlantısı sunmaz. Bu yüzden [migrate-local.ts](./src/db/migrate-local.ts), aynı `prisma/migrations/` SQL dosyalarını transaction içinde çalıştırır ve standart `_prisma_migrations` geçmişini kaydeder. PGlite kullanılırken web sunucusu migration/seed/CLI işlemlerinden önce durdurulur; aynı veri klasörüne iki süreç bağlanmaz.
+
+Eski Drizzle migration tablosu yalnız geçişin doğrulanması için okunur. Bilinen ilk iki migration'ın LF/CRLF hash'leri doğrulanır; uygulanmış dosyalar yeniden çalıştırılmadan Prisma geçmişine alınır. Tanınmayan eski geçmişte geçiş durur. Yerel Prisma migration geçmişinde eksik tamamlanma veya değişmiş checksum varsa işlem de durdurulur. SQL dosyaları `.gitattributes` ile LF satır sonuna sabitlenmiştir.
+
+SQL migration'larındaki kısmi benzersiz başvuru indeksi, fiyat/içerik kontrolleri ve değişmez tarih tetikleyicileri korunur. Bölümün cilt ve kitap ilişkisini doğrulayan bileşik foreign key Prisma şemasında da temsil edilir. Mevcut ilk yayın/onay zamanı güncellemede yeniden yazılmaz; eski PostgreSQL kayıtlarının mikrosaniye hassasiyeti korunur. `prisma db push`, incelenmiş migration'ların ve bu özel SQL kurallarının yerine kullanılmaz.
 
 ## 6. Uygulama mimarisi
 
@@ -223,7 +277,7 @@ flowchart TD
     H --> S
 ```
 
-Bağımlılık yönü: `app → application services → domain policies → repository/provider interfaces`. Drizzle ve dış servis adaptörleri bu arayüzleri uygular. Domain kuralları Next.js, ödeme SDK'sı veya UI bileşenlerini import etmez. Modüller birbirinin tablolarına gelişigüzel yazmaz; ilgili uygulama servisini çağırır.
+Bağımlılık yönü: `app → application services → domain policies → repository/provider interfaces`. Prisma ve dış servis adaptörleri bu arayüzleri uygular. Domain kuralları Next.js, ödeme SDK'sı veya UI bileşenlerini import etmez. Modüller birbirinin tablolarına gelişigüzel yazmaz; ilgili uygulama servisini çağırır.
 
 | Modül | Sahip olduğu sorumluluk |
 | --- | --- |
@@ -238,7 +292,38 @@ Bağımlılık yönü: `app → application services → domain policies → rep
 | `notifications` | Uygulama içi bildirim, e-posta tercihi ve teslim işleri |
 | `audit` | Yetkili işlemlerin değiştirilemez denetim kaydı |
 
-### 6.2. Önerilen dosya yapısı
+### 6.2. Mevcut ve hedef dosya yapısı
+
+Çalışan uygulama:
+
+```text
+webnovel-gpt6/
+├── src/
+│   ├── app/                      # Keşif, kitap, okuyucu, hesap, studio, admin
+│   ├── components/               # Shell, kapak, formlar, Tiptap ve okuyucu
+│   ├── db/
+│   │   ├── index.ts              # Prisma Client ve bağlantı adaptörleri
+│   │   ├── schema.ts             # Ortak TypeScript tipleri; ORM şeması değil
+│   │   └── migrate-local.ts      # PGlite migration ve geçmiş doğrulaması
+│   ├── generated/prisma/         # Üretilir; Git dışında
+│   ├── lib/                      # Better Auth, oturum ve yardımcılar
+│   └── modules/
+│       ├── catalog/              # Katalog, bölüm listesi, yorum ve kütüphane sorguları
+│       ├── publishing/           # İçerik doğrulama, politikalar, servis ve actions
+│       └── community/            # Kaydetme, puan, yorum ve ilerleme actions
+├── prisma/
+│   ├── schema.prisma
+│   └── migrations/               # Başlangıç SQL'i ve yayın değişmezlik kuralları
+├── public/art/                   # Anime kapakları, vitrin ve ARTWORK.md
+├── scripts/                      # Migration, seed ve yönetici CLI
+├── tests/                        # Yayın ve migration testleri, e2e/
+├── prisma.config.ts
+├── compose.yaml
+├── package-lock.json
+└── README.md
+```
+
+Worker, ödeme, dosya yükleme ve modül ayrımı genişlediğinde kullanılacak hedef yapı:
 
 ```text
 webnovel/
@@ -264,19 +349,21 @@ webnovel/
 │   │   ├── premium/
 │   │   └── ...
 │   ├── components/ui/
-│   ├── db/schema/
+│   ├── db/                       # Prisma bağlantısı ve veri erişim yardımcıları
+│   ├── generated/prisma/         # Şemadan üretilen istemci
 │   ├── lib/                      # Auth, config, log, ortak altyapı
 │   └── worker/                   # Başlatıcı, outbox, job handler'ları
-├── drizzle/                      # İncelenen SQL migration'ları
+├── prisma/                       # schema.prisma ve incelenen SQL migration'ları
+├── prisma.config.ts
 ├── tests/{unit,integration,e2e}/
 ├── Dockerfile
 ├── compose.yaml                  # Yerel PostgreSQL ve servisler
 ├── .env.example                  # Yalnız değişken adları/örnekler
-├── pnpm-lock.yaml
+├── package-lock.json
 └── WEBNOVEL_MIMARI.md
 ```
 
-Bu ağaç önerilen hedef yapıdır; bu dokümanla birlikte oluşturulmuş uygulama dosyalarını göstermez.
+İkinci ağaç hedef yapıdır; worker, commerce, ödeme route'ları ve Dockerfile henüz mevcut değildir. İlk ağaç çalışan depoyu gösterir.
 
 ### 6.3. Next.js veri ve erişim sınırları
 
@@ -293,6 +380,10 @@ Bu ağaç önerilen hedef yapıdır; bu dokümanla birlikte oluşturulmuş uygul
 Next.js'in cache davranışı kullanılan yapılandırmaya göre değişir; kurulumda açık cache sınırları seçilip test edilir. [Next.js caching dokümanı](https://nextjs.org/docs/app/getting-started/caching).
 
 ## 7. Veri modeli
+
+Bu bölümün ER diyagramı ve geniş tablo listesi hedef veri modelini anlatır. Mevcut şema `User`, `Session`, `Account`, `Verification`, `Book`, `Volume`, `Chapter`, `ChapterRevision`, `Application`, `Rating`, `Comment`, `LibraryEntry`, `ReadingProgress`, `AuditLog` ve `RateLimit` modellerinden oluşur.
+
+Çalışan sürümde yayın ve premium başvuruları ayrı tablolar yerine `applications.type = PUBLICATION | PREMIUM` ile tutulur; başvuru durumları `PENDING | APPROVED | REJECTED` değerleridir. Bölümün `content` alanı taslağı, `publishedContent` ve `publishedTitle` alanları canlı sürümü taşır. Geçmiş sürümler `chapter_revisions`, başvuru örnekleri değişmez JSON anlık görüntüsü içinde saklanır. Bölüm durumları `DRAFT | PUBLISHED`, hikâye durumları `ONGOING | COMPLETED | HIATUS` değerleridir. Sipariş, erişim hakkı, finans ve bildirim tabloları henüz oluşturulmamıştır.
 
 ### 7.1. Temel ilişkiler
 
@@ -356,7 +447,7 @@ Tüm iş tablolarında UUID kimlikleri, uygun foreign key'ler ve `timestamptz` z
 - Başvuru tablolarında açık durumlar için kısmi benzersiz indeks: kitap başına tek açık başvuru.
 - Sağlayıcı ödeme referansı, yerel idempotency anahtarı ve işlenen olay anahtarı için uygun kapsamda benzersiz indeksler.
 - `chapters(book_id, status)`, `chapters(status, scheduled_at)`, `comments(book_id, created_at, id)`, `orders(user_id, created_at, id)` ve açık moderasyon kuyruğu indeksleri.
-- İlk sürüm araması kitap/yazar adlarında trigram indekslerini kullanır. Türkçe `i/ı/İ/I` normalizasyonu test edilir. [PostgreSQL pg_trgm dokümanı](https://www.postgresql.org/docs/current/pgtrgm.html).
+- Hedef arama kitap/yazar adlarında trigram indekslerini kullanır; mevcut uygulama parametreli `ILIKE` sorgusu çalıştırır. Türkçe `i/ı/İ/I` normalizasyonu ayrıca doğrulanmalıdır. [PostgreSQL pg_trgm dokümanı](https://www.postgresql.org/docs/current/pgtrgm.html).
 - Satış ve denetim ilişkilerinde zincirleme fiziksel silme kullanılmaz. Arayüzden kaldırma, finans kayıtlarının yok edilmesi anlamına gelmez.
 
 Kitap premium durumu gibi tablolar arası kurallar sıradan `CHECK` kısıtına bırakılmaz. Servis transaction'ları, tutarlı kilit sırası ve gerekirse DB tetikleyicileriyle korunur. Uygulama kullanıcısı dışında doğrudan tablo yazma yetkisi sınırlandırılır.
@@ -435,6 +526,10 @@ Premium askısı ücretli bölümleri otomatik ücretsiz yapmaz. Yeni kullanıc�
 
 ### 9.1. URL yapısı
 
+Mevcut yollar: `/`, `/kesfet`, `/kitap/[slug]`, `/oku/[chapterId]`, `/giris`, `/kayit`, `/sifremi-unuttum`, `/sifre-yenile`, `/hesap`, `/kutuphanem`, `/hakkinda`, `/studio`, `/studio/yeni`, `/studio/books/[bookId]`, `/studio/books/[bookId]/chapters/[chapterId]` ve `/admin`. Başvurular kitabın stüdyo ekranından gönderilir, yönetici incelemesi `/admin` üzerinden yapılır. Auth route'u `/api/auth/[...all]` şeklindedir.
+
+Aşağıdaki tablo hedef yolları da içerir; ayrı tür/yazar profili, satın alma ve yönetim alt sayfaları henüz uygulanmamıştır.
+
 | Alan | Örnek yollar |
 | --- | --- |
 | Keşif | `/`, `/kesfet`, `/tur/[slug]`, `/yazar/[username]` |
@@ -448,6 +543,8 @@ Premium askısı ücretli bölümleri otomatik ücretsiz yapmaz. Yeni kullanıc�
 Kitap slug'ı değişirse eski bağlantılar yönlendirme tablosuyla korunur. URL'de tahmin edilemeyen kimlik kullanılması yetki kontrolünün yerine geçmez.
 
 ### 9.2. Servis sözleşmeleri
+
+Mevcut yayın servisleri `createBook`, `addVolume`, `addChapter`, `saveChapter`, `submitApplication`, `reviewApplication`, `publishChapter` ve `setChapterPrice` fonksiyonlarıdır. Kütüphane, puan, yorum ve ilerleme işlemleri `interactAction` ile yürür. Aşağıdaki komutlar genişletilmiş hedef sözleşmelerdir; ödeme ve zamanlama servisleri henüz yoktur.
 
 | Komut / sorgu | Kritik kontrol |
 | --- | --- |
@@ -533,6 +630,26 @@ Altyapı giderleri: web/worker işlem gücü, PostgreSQL ve yedekler, nesne depo
 
 ## 14. Test ve kabul kriterleri
 
+### 14.1. Tamamlanan doğrulama
+
+17 Eylül 2026 tarihli son uygulama kontrolü:
+
+| Kontrol | Sonuç ve kapsam |
+| --- | --- |
+| `npm test` | 24 test başarılı: 21 yayın/içerik testi ve 3 migration testi. Otomatik yayın ve katalog görünürlüğü, incelenen sürümün korunması, gizli/eksik örnekte rollback, yöneticinin kendi kitabında karar verebilmesi, yetki sınırları ve işlem kayıtları kapsanır. Prisma Client ve geçici PGlite veritabanları kullanılır. |
+| `npm run test:e2e` | Üretim derlemesi ve 3 Playwright testi başarılı. Keşif/arama/mobil okuma; kayıt/kütüphane/yorum/yayın/premium; ücretli metnin HTML/RSC/liste yanıtlarından korunması. |
+| `npm run typecheck`, `npm run lint` | Başarılı. |
+| Prisma şeması | Doğrulama ve istemci üretimi başarılı. |
+| Migration geçişi | Mevcut yerel veriler korundu; tekrar çalıştırma, tanınmayan eski geçmiş ve checksum uyuşmazlığı test edildi. |
+| Tarih hassasiyeti | Mikrosaniyeli eski ilk yayın zamanı yeniden yayında aynen korunuyor. |
+| Görsel kontrol | Masaüstü ve mobilde ana sayfa, kitap detayları ve okuyucu incelendi; kapaklar yükleniyor, yatay taşma yok. |
+| Mobil erişilebilirlik | Menü odağı, Escape ile kapatma ve açma düğmesine odak dönüşü test edildi. |
+| Bağımlılıklar | Son `npm audit` kontrolünde 0 bilinen açık. |
+
+Bu sonuçlar mevcut yerel doğrulama kaydıdır. Gerçek PostgreSQL sunucusu, üretim e-posta teslimi, yedekten dönüş, yük testleri ve uzak CI çalıştırması bu kontrolde doğrulanmış değildir.
+
+### 14.2. Hedef kabul kriterleri
+
 Saf iş kuralları unit test, transaction ve eşzamanlılık gerçek PostgreSQL entegrasyon testi, kullanıcı yolculukları Playwright ile doğrulanır. SQLite taklidi finans ve kilit davranışının testi için yeterli değildir.
 
 | Senaryo | Beklenen sonuç |
@@ -564,9 +681,11 @@ Saf iş kuralları unit test, transaction ve eşzamanlılık gerçek PostgreSQL 
 
 ## 15. Geliştirme aşamaları
 
+Mevcut durum: Aşama 1'in temel uygulama ve kimlik akışı çalışıyor. Aşama 2'de editör, başvuru ve yayın; Aşama 3'te keşif, okuyucu ve topluluk özellikleri hazır. Worker/zamanlama, gelişmiş moderasyon, bildirim ve operasyon kontrolleri bekliyor. Aşama 4'ten premium başvurusu ve fiyat uygunluğu uygulanmış olsa da ödeme, satın alınmış erişim ve gelir işlemleri henüz yok; bu aşama tamamlanmış sayılmaz.
+
 ### Aşama 1 — Temel altyapı ve kimlik
 
-Next.js/TypeScript kurulumu, modül sınırları, PostgreSQL/Drizzle migration'ları, Better Auth, e-posta doğrulama, roller, ortam yapılandırması, CI ve loglama.
+Next.js/TypeScript kurulumu, modül sınırları, PostgreSQL/Prisma migration'ları, Better Auth, e-posta doğrulama, roller, ortam yapılandırması, CI ve loglama.
 
 Çıkış ölçütü: Kullanıcı kaydolur, doğrulanır, giriş yapar; yetkisiz yönetim ve başka kullanıcı verisine erişim engellenir.
 

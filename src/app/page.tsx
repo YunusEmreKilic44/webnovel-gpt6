@@ -1,182 +1,243 @@
+import Image from "next/image";
 import Link from "next/link";
-import { getCatalog } from "@/modules/catalog/queries";
+import { getCatalog, getPublicChapters } from "@/modules/catalog/queries";
 import { BookCard } from "@/components/book-card";
 import { BookCover } from "@/components/book-cover";
 import {
   ArrowRight,
-  ArrowUpRight,
   BookOpen,
   ChevronRight,
-  Feather,
-  Sparkles,
+  Flame,
   Star,
+  TrendingUp,
 } from "@/components/icons";
-import { genres } from "@/lib/utils";
+import {
+  Sword,
+  Rocket,
+  Heart,
+  ScanEye,
+  Mountain,
+  Drama,
+  Sparkles,
+} from "lucide-react";
+import { genres, date } from "@/lib/utils";
 
+const genreIcons = [Sparkles, Sword, Rocket, Heart, ScanEye, Mountain, Drama];
 export default async function Home() {
-  const catalog = await getCatalog();
+  const [catalog, ranked, recent] = await Promise.all([
+    getCatalog(),
+    getCatalog({ sort: "rating" }),
+    getCatalog({ sort: "recent" }),
+  ]);
   const featured = catalog[0];
+  const firstChapter = featured
+    ? (await getPublicChapters(featured.id))[0]
+    : undefined;
   return (
     <div className="home-page">
-      <div className="page-heading">
-        <div>
-          <div className="eyebrow">
-            <span /> HAYAL GÜCÜNÜN SINIRI YOK
-          </div>
-          <h1>
-            Bir sonraki dünyanı keşfet<span className="accent-text">.</span>
-          </h1>
-          <p>Bir sayfa çevir. Bir hayata dokun. Hiç gitmediğin bir yere git.</p>
-        </div>
-        <span className="heading-decoration">✳</span>
-      </div>
-      <div className="genre-tabs">
-        {genres.map((genre, i) => (
-          <Link
-            key={genre}
-            className={i === 0 ? "genre-tab selected" : "genre-tab"}
-            href={
-              i === 0 ? "/kesfet" : `/kesfet?genre=${encodeURIComponent(genre)}`
-            }
-          >
-            {i === 0 && <Sparkles size={14} />}
-            {genre}
-          </Link>
-        ))}
-      </div>
-      <section className="feature-grid" aria-label="Öne çıkan hikâye">
-        {featured ? (
-          <div className="featured-story">
-            <div className="feature-grain" />
-            <div className="featured-copy">
-              <div className="feature-tag">
-                <Star size={12} fill="currentColor" /> EDİTÖRÜN SEÇİMİ
-              </div>
-              <h2>
-                Bazı hikâyeler,
-                <br />
-                içinde bir dünya açar.
-              </h2>
-              <p>{featured.description.slice(0, 132)}…</p>
-              <div className="featured-byline">
-                <span className="small-avatar">
-                  {featured.author.charAt(0)}
+      <section className="home-hero" aria-label="Öne çıkan hikâye">
+        <Image
+          className="hero-image"
+          src={
+            featured?.cover && featured.cover !== "ember"
+              ? `/art/${featured.cover}.png`
+              : "/art/hero.png"
+          }
+          alt=""
+          fill
+          priority
+          sizes="100vw"
+        />
+        <div className="hero-shade" />
+        <div className="hero-inner">
+          <div className="hero-copy">
+            <span className="feature-tag">
+              <Flame size={15} fill="currentColor" /> HAFTANIN HİKÂYESİ
+            </span>
+            <div className="hero-genres">
+              <span>{featured?.genre ?? "Webnovel"}</span>
+              <span>ORİJİNAL SERİ</span>
+              <span>
+                {featured?.storyStatus === "COMPLETED"
+                  ? "Tamamlandı"
+                  : "Devam ediyor"}
+              </span>
+            </div>
+            <h1>{featured?.title ?? "Yeni dünyalar seni bekliyor."}</h1>
+            <p>
+              {featured?.description ??
+                "İlk hikâyeni yaz ve okuyucularla buluştur."}
+            </p>
+            {featured && (
+              <div className="hero-meta">
+                <span className="rating">
+                  <Star size={15} fill="currentColor" />{" "}
+                  {featured.averageRating > 0
+                    ? featured.averageRating.toLocaleString("tr-TR")
+                    : "Yeni"}
                 </span>
-                <span>
-                  {featured.author}
-                  <small>
-                    {featured.genre} · {featured.chapterCount} bölüm
-                  </small>
-                </span>
+                <span>{featured.chapterCount} bölüm</span>
+                <span>{featured.author}</span>
               </div>
+            )}
+            <div className="hero-actions">
               <Link
-                href={`/kitap/${featured.slug}`}
-                className="button button-cream"
+                href={firstChapter ? `/oku/${firstChapter.id}` : "/studio/yeni"}
+                className="button button-dark"
               >
-                Hikâyeyi keşfet <ArrowRight size={16} />
+                <BookOpen size={17} />
+                {firstChapter ? "Okumaya başla" : "Hikâyeni yaz"}
+                <ArrowRight size={17} />
+              </Link>
+              {featured && (
+                <Link
+                  href={`/kitap/${featured.slug}`}
+                  className="button button-glass"
+                >
+                  Seriyi incele <ChevronRight size={17} />
+                </Link>
+              )}
+            </div>
+          </div>
+          <div className="hero-edition">
+            <span>SPOTLIGHT</span>
+            <strong>
+              01<span> / {String(catalog.length).padStart(2, "0")}</span>
+            </strong>
+          </div>
+        </div>
+      </section>
+      <div className="home-container">
+        <nav className="genre-tabs" aria-label="Hikâye türleri">
+          {genres.map((genre, index) => {
+            const Icon = genreIcons[index];
+            return (
+              <Link
+                key={genre}
+                href={
+                  index
+                    ? `/kesfet?genre=${encodeURIComponent(genre)}`
+                    : "/kesfet"
+                }
+                className={index ? "genre-tab" : "genre-tab selected"}
+              >
+                <Icon size={17} />
+                {index ? genre : "Tüm dünyalar"}
+              </Link>
+            );
+          })}
+        </nav>
+        <section className="home-section">
+          <div className="section-heading">
+            <div>
+              <span className="section-eyebrow">BİR BÖLÜM DAHA?</span>
+              <h2>
+                <Flame size={23} className="accent-text" />
+                Radarına girecek seriler
+              </h2>
+            </div>
+            <Link href="/kesfet">
+              Tüm seriler <ArrowRight size={16} />
+            </Link>
+          </div>
+          {catalog.length ? (
+            <div className="book-grid">
+              {catalog.slice(0, 6).map((book) => (
+                <BookCard key={book.id} book={book} />
+              ))}
+            </div>
+          ) : (
+            <div className="empty-state">
+              <BookOpen size={36} />
+              <h2>İlk hikâye seninki olsun.</h2>
+              <Link href="/studio/yeni" className="button button-dark">
+                Yazmaya başla
               </Link>
             </div>
-            <div className="featured-art">
-              <div className="orb orb-one" />
-              <div className="orb orb-two" />
-              <span className="feature-star star-one">✦</span>
-              <span className="feature-star star-two">✧</span>
-              <BookCover
-                title={featured.title}
-                cover={featured.cover}
-                author={featured.author}
-                subtitle={featured.subtitle}
-                className="hero-cover"
-              />
-              <div className="hero-book-shadow" />
-            </div>
-          </div>
-        ) : (
-          <div className="empty-state">
-            <BookOpen size={36} />
-            <h2>İlk hikâye seninki olsun.</h2>
-            <Link href="/studio/yeni" className="button button-dark">
-              Yazmaya başla
-            </Link>
-          </div>
-        )}
-        <div className="discovery-note">
-          <div className="note-top">
-            <span>HİKÂYELERİN ARDINDA</span>
-            <Feather size={20} strokeWidth={1.4} />
-          </div>
-          <div className="note-illustration">
-            <span className="little-star">✦</span>
-            <BookOpen size={59} strokeWidth={0.8} />
-            <span className="little-star second">✧</span>
-          </div>
-          <h3>
-            Henüz yazılmamış
-            <br />
-            dünyalar var.
-          </h3>
-          <p>
-            Aklındaki karakterlere bir ses,
-            <br />
-            hayalindeki dünyaya bir ev ver.
-          </p>
-          <Link href="/studio/yeni">
-            İlk satırını yaz <ArrowUpRight size={17} />
-          </Link>
-        </div>
-      </section>
-      <section className="home-section">
-        <div className="section-heading">
-          <div>
-            <span className="section-eyebrow">YENİ BİR HİKÂYEYE YER AÇ</span>
-            <h2>Okuma listene çok yakışacak</h2>
-          </div>
-          <Link href="/kesfet">
-            Tümünü keşfet <ArrowRight size={16} />
-          </Link>
-        </div>
-        <div className="book-grid">
-          {catalog.slice(0, 6).map((book) => (
-            <BookCard key={book.id} book={book} />
-          ))}
-        </div>
-      </section>
-      <section className="home-section updates-section">
-        <div className="section-heading">
-          <div>
-            <span className="section-eyebrow">HİKÂYE DEVAM EDİYOR</span>
-            <h2>Yeni satırlar, yeni heyecanlar</h2>
-          </div>
-          <Link href="/kesfet">
-            Son güncellenenler <ArrowRight size={16} />
-          </Link>
-        </div>
-        <div className="update-list">
-          {catalog.slice(0, 4).map((book, index) => (
-            <Link
-              href={`/kitap/${book.slug}`}
-              className="update-item"
-              key={book.id}
-            >
-              <span className="update-number">0{index + 1}</span>
-              <BookCover title={book.title} cover={book.cover} />
+          )}
+        </section>
+        <div className="home-lower">
+          <section className="home-section">
+            <div className="section-heading">
               <div>
-                <h3>{book.title}</h3>
-                <p>
-                  {book.author} <span>·</span> {book.genre}
-                </p>
+                <span className="section-eyebrow">HİKÂYE DEVAM EDİYOR</span>
+                <h2>Son güncellemeler</h2>
               </div>
-              <span className="update-chapters">{book.chapterCount} bölüm</span>
-              <ChevronRight size={16} />
+              <Link href="/kesfet?sort=recent">
+                Tümü <ArrowRight size={16} />
+              </Link>
+            </div>
+            <div className="update-list">
+              {recent.slice(0, 6).map((book) => (
+                <Link
+                  href={`/kitap/${book.slug}`}
+                  className="update-item"
+                  key={book.id}
+                >
+                  <BookCover title={book.title} cover={book.cover} />
+                  <div>
+                    <h3>{book.title}</h3>
+                    <p>
+                      {book.genre} <span>·</span> {book.author}
+                    </p>
+                    <small>{date(book.updatedAt)}</small>
+                  </div>
+                  <span className="update-chapters">
+                    {book.chapterCount} bölüm
+                    <ChevronRight size={15} />
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </section>
+          <section className="home-section ranking-section">
+            <div className="section-heading">
+              <div>
+                <span className="section-eyebrow">OKURLARIN SEÇİMİ</span>
+                <h2>
+                  <TrendingUp size={22} />
+                  En yüksek puanlılar
+                </h2>
+              </div>
+            </div>
+            <div className="ranking-list">
+              {ranked.slice(0, 5).map((book, index) => (
+                <Link
+                  href={`/kitap/${book.slug}`}
+                  key={book.id}
+                  className="ranking-item"
+                >
+                  <span className="rank-number">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <BookCover title={book.title} cover={book.cover} />
+                  <div>
+                    <h3>{book.title}</h3>
+                    <p>{book.genre}</p>
+                    <span className="rating">
+                      <Star size={12} fill="currentColor" />{" "}
+                      {book.averageRating > 0
+                        ? book.averageRating.toLocaleString("tr-TR")
+                        : "Yeni"}
+                    </span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+            <Link href="/kesfet?sort=rating" className="ranking-more">
+              Sıralamayı gör <ArrowRight size={15} />
             </Link>
-          ))}
+          </section>
         </div>
-      </section>
-      <div className="quote-strip">
-        <span>“</span>
-        <p>Bir hikâye okursun, dünya biraz daha büyür.</p>
-        <span className="quote-line" />
-        <small>SATIR’A HOŞ GELDİN</small>
+        <section className="writer-band">
+          <div>
+            <span className="section-eyebrow">SIRADAKİ EVREN SENİN OLSUN</span>
+            <h2>Kendi hikâyenin kahramanı ol.</h2>
+          </div>
+          <Link href="/studio/yeni" className="button button-outline">
+            Yazmaya başla <ArrowRight size={17} />
+          </Link>
+        </section>
       </div>
     </div>
   );

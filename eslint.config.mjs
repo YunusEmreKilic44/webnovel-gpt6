@@ -7,7 +7,7 @@ export default defineConfig([
   globalIgnores([
     ".next/**",
     ".data/**",
-    "drizzle/**",
+    "src/generated/**",
     "next-env.d.ts",
     "playwright-report/**",
     "test-results/**",

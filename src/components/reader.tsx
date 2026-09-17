@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { Minus, Plus, Circle } from "lucide-react";
 import Link from "next/link";
 import type { JSONContent } from "@tiptap/react";
 import { RichText } from "./rich-text";
@@ -62,6 +63,7 @@ export function Reader(props: ReaderProps) {
           className="icon-button"
           disabled={!hydrated}
           onClick={() => setSettings(!settings)}
+          title="Okuma ayarları"
           aria-label="Okuma ayarları"
           aria-expanded={settings}
         >
@@ -75,6 +77,7 @@ export function Reader(props: ReaderProps) {
             onClick={() => changeTheme("paper")}
             className="icon-button"
             aria-label="Açık tema"
+            title="Açık tema"
             aria-pressed={theme === "paper"}
           >
             <Sun size={17} />
@@ -82,14 +85,17 @@ export function Reader(props: ReaderProps) {
           <button
             onClick={() => changeTheme("sepia")}
             className="icon-button"
+            aria-label="Sepya tema"
+            title="Sepya tema"
             aria-pressed={theme === "sepia"}
           >
-            Sepya
+            <Circle size={17} fill="#d8c6a1" color="#907650" />
           </button>
           <button
             onClick={() => changeTheme("dark")}
             className="icon-button"
             aria-label="Koyu tema"
+            title="Koyu tema"
             aria-pressed={theme === "dark"}
           >
             <Moon size={17} />
@@ -99,16 +105,18 @@ export function Reader(props: ReaderProps) {
             onClick={() => changeFont(fontSize - 2)}
             className="icon-button"
             aria-label="Yazıyı küçült"
+            title="Yazıyı küçült"
           >
-            A−
+            <Minus size={17} />
           </button>
           <span>{fontSize}</span>
           <button
             onClick={() => changeFont(fontSize + 2)}
             className="icon-button"
             aria-label="Yazıyı büyüt"
+            title="Yazıyı büyüt"
           >
-            A+
+            <Plus size={17} />
           </button>
         </div>
       )}

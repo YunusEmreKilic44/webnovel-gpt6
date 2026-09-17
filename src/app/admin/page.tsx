@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
-import { desc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
-import { applications, books, user } from "@/db/schema";
+import type { ApplicationSnapshot } from "@/db/schema";
 import { requireUser } from "@/lib/session";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { reviewApplicationAction } from "@/modules/publishing/actions";
@@ -15,17 +14,20 @@ export const metadata = {
 export default async function Admin() {
   const actor = await requireUser();
   if (actor.role !== "admin" || !actor.emailVerified) notFound();
-  const queue = await getDb()
-    .select({
-      application: applications,
-      authorId: books.authorId,
-      author: user.name,
-    })
-    .from(applications)
-    .innerJoin(books, eq(books.id, applications.bookId))
-    .innerJoin(user, eq(user.id, books.authorId))
-    .orderBy(desc(applications.createdAt))
-    .limit(100);
+  const rows = await getDb().application.findMany({
+    include: {
+      book: { select: { author: { select: { name: true } } } },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 100,
+  });
+  const queue = rows.map(({ book, ...application }) => ({
+    application: {
+      ...application,
+      snapshot: application.snapshot as ApplicationSnapshot,
+    },
+    author: book.author.name,
+  }));
   return (
     <>
       <div className="studio-heading">
@@ -50,7 +52,7 @@ export default async function Admin() {
       </div>
       <div className="stack">
         {queue.length ? (
-          queue.map(({ application: a, author, authorId }) => (
+          queue.map(({ application: a, author }) => (
             <article className="application-card" key={a.id}>
               <header>
                 <span className="label-pill">
@@ -65,7 +67,7 @@ export default async function Admin() {
                       PENDING: "İnceleniyor",
                       APPROVED: "Onaylandı",
                       REJECTED: "Reddedildi",
-                    }[a.status]
+                    }[a.status as "PENDING" | "APPROVED" | "REJECTED"]
                   }
                 </span>
               </header>
@@ -82,7 +84,7 @@ export default async function Admin() {
                   <RichText content={chapter.content} />
                 </details>
               ))}
-              {a.status === "PENDING" && authorId !== actor.id ? (
+              {a.status === "PENDING" ? (
                 <ActionForm
                   action={reviewApplicationAction}
                   className="form-stack"
@@ -101,7 +103,9 @@ export default async function Admin() {
                   <div className="button-row">
                     <SubmitButton name="decision" value="APPROVED">
                       <CheckCircle2 size={15} />
-                      Onayla
+                      {a.type === "PUBLICATION"
+                        ? "Onayla ve yayımla"
+                        : "Onayla"}
                     </SubmitButton>
                     <SubmitButton
                       name="decision"
@@ -114,7 +118,7 @@ export default async function Admin() {
                 </ActionForm>
               ) : (
                 <p style={{ marginTop: 15 }}>
-                  {a.note || "Kendi kitabının başvurusunu değerlendiremezsin."}
+                  {a.note || "Başvuru değerlendirildi."}
                 </p>
               )}
             </article>

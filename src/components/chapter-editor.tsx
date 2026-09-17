@@ -14,6 +14,15 @@ import { saveChapterAction } from "@/modules/publishing/actions";
 import { initialActionState } from "@/lib/action-state";
 import { wordCount } from "@/modules/publishing/content";
 import { Check, LoaderCircle } from "./icons";
+import {
+  Bold,
+  Italic,
+  Heading2,
+  Quote,
+  List,
+  Undo2,
+  Redo2,
+} from "lucide-react";
 
 export function ChapterEditor({
   chapter,
@@ -120,16 +129,18 @@ export function ChapterEditor({
           type="button"
           onClick={() => editor?.chain().focus().toggleBold().run()}
           aria-label="Kalın"
+          title="Kalın"
           className={editor?.isActive("bold") ? "is-active" : ""}
         >
-          <strong>B</strong>
+          <Bold size={16} />
         </button>
         <button
           type="button"
           onClick={() => editor?.chain().focus().toggleItalic().run()}
           aria-label="İtalik"
+          title="İtalik"
         >
-          <em>I</em>
+          <Italic size={16} />
         </button>
         <button
           type="button"
@@ -137,36 +148,41 @@ export function ChapterEditor({
             editor?.chain().focus().toggleHeading({ level: 2 }).run()
           }
           aria-label="Başlık"
+          title="Başlık"
         >
-          H2
+          <Heading2 size={16} />
         </button>
         <button
           type="button"
           onClick={() => editor?.chain().focus().toggleBlockquote().run()}
           aria-label="Alıntı"
+          title="Alıntı"
         >
-          “ ”
+          <Quote size={16} />
         </button>
         <button
           type="button"
           onClick={() => editor?.chain().focus().toggleBulletList().run()}
           aria-label="Madde listesi"
+          title="Madde listesi"
         >
-          ☷
+          <List size={16} />
         </button>
         <button
           type="button"
           onClick={() => editor?.chain().focus().undo().run()}
           aria-label="Geri al"
+          title="Geri al"
         >
-          ↶
+          <Undo2 size={16} />
         </button>
         <button
           type="button"
           onClick={() => editor?.chain().focus().redo().run()}
           aria-label="Yinele"
+          title="Yinele"
         >
-          ↷
+          <Redo2 size={16} />
         </button>
         <span className="editor-word-count">{wordCount(content)} kelime</span>
       </div>

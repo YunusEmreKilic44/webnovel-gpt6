@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, eq } from "drizzle-orm";
 import { getDb } from "@/db";
-import { books, chapters } from "@/db/schema";
+import type { JSONContent } from "@tiptap/react";
 import { requireUser } from "@/lib/session";
 import { ChapterEditor } from "@/components/chapter-editor";
 import { ActionForm, SubmitButton } from "@/components/action-form";
@@ -19,15 +18,13 @@ export default async function EditChapter({
   const actor = await requireUser();
   const { bookId, chapterId } = await params;
   const db = getDb();
-  const [book] = await db
-    .select()
-    .from(books)
-    .where(and(eq(books.id, bookId), eq(books.authorId, actor.id)));
+  const book = await db.book.findFirst({
+    where: { id: bookId, authorId: actor.id },
+  });
   if (!book) notFound();
-  const [chapter] = await db
-    .select()
-    .from(chapters)
-    .where(and(eq(chapters.id, chapterId), eq(chapters.bookId, bookId)));
+  const chapter = await db.chapter.findFirst({
+    where: { id: chapterId, bookId },
+  });
   if (!chapter) notFound();
   const eligible =
     book.premiumStatus === "ACTIVE" &&
@@ -57,7 +54,7 @@ export default async function EditChapter({
         chapter={{
           id: chapter.id,
           title: chapter.title,
-          content: chapter.content,
+          content: chapter.content as JSONContent,
           version: chapter.version,
         }}
       />

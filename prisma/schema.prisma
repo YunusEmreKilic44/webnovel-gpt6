@@ -1,0 +1,254 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Account {
+  id                    String    @id
+  accountId             String    @map("account_id")
+  providerId            String    @map("provider_id")
+  userId                String    @map("user_id")
+  accessToken           String?   @map("access_token")
+  refreshToken          String?   @map("refresh_token")
+  idToken               String?   @map("id_token")
+  accessTokenExpiresAt  DateTime? @map("access_token_expires_at") @db.Timestamptz(6)
+  refreshTokenExpiresAt DateTime? @map("refresh_token_expires_at") @db.Timestamptz(6)
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "account_user_id_user_id_fk")
+
+  @@map("account")
+}
+
+model Application {
+  id         String    @id
+  bookId     String    @map("book_id")
+  type       String
+  status     String    @default("PENDING")
+  snapshot   Json
+  note       String    @default("")
+  reviewerId String?   @map("reviewer_id")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  reviewedAt DateTime? @map("reviewed_at") @db.Timestamptz(6)
+  book       Book      @relation(fields: [bookId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "applications_book_id_books_id_fk")
+  reviewer   User?     @relation(fields: [reviewerId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "applications_reviewer_id_user_id_fk")
+
+  @@map("applications")
+}
+
+model AuditLog {
+  id        String   @id
+  actorId   String   @map("actor_id")
+  action    String
+  targetId  String   @map("target_id")
+  detail    String   @default("")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  actor     User     @relation(fields: [actorId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "audit_logs_actor_id_user_id_fk")
+
+  @@map("audit_logs")
+}
+
+model Book {
+  id                     String            @id
+  authorId               String            @map("author_id")
+  slug                   String
+  title                  String
+  subtitle               String            @default("")
+  description            String
+  genre                  String
+  cover                  String            @default("ember")
+  status                 String            @default("DRAFT")
+  storyStatus            String            @default("ONGOING") @map("story_status")
+  premiumStatus          String            @default("NONE") @map("premium_status")
+  firstPremiumApprovedAt DateTime?         @map("first_premium_approved_at") @db.Timestamptz(6)
+  hidden                 Boolean           @default(false)
+  featured               Boolean           @default(false)
+  createdAt              DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime          @default(now()) @map("updated_at") @db.Timestamptz(6)
+  author                 User              @relation(fields: [authorId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "books_author_id_user_id_fk")
+  applications           Application[]
+  chapters               Chapter[]
+  comments               Comment[]
+  libraryEntries         LibraryEntry[]
+  ratings                Rating[]
+  readingProgress        ReadingProgress[]
+  volumes                Volume[]
+
+  @@unique([slug], map: "books_slug_unique")
+  @@index([status, hidden, updatedAt], map: "books_catalog_idx")
+  @@map("books")
+}
+
+model ChapterRevision {
+  id        String   @id
+  chapterId String   @map("chapter_id")
+  version   Int
+  title     String
+  content   Json
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  chapter   Chapter  @relation(fields: [chapterId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "chapter_revisions_chapter_id_chapters_id_fk")
+
+  @@unique([chapterId, version], map: "revision_version_idx")
+  @@map("chapter_revisions")
+}
+
+model Chapter {
+  id                 String            @id
+  bookId             String            @map("book_id")
+  volumeId           String            @map("volume_id")
+  title              String
+  position           Int
+  content            Json
+  publishedContent   Json?             @map("published_content")
+  publishedTitle     String?           @map("published_title")
+  wordCount          Int               @default(0) @map("word_count")
+  publishedWordCount Int               @default(0) @map("published_word_count")
+  status             String            @default("DRAFT")
+  accessType         String            @default("FREE") @map("access_type")
+  priceMinor         Int               @default(0) @map("price_minor")
+  firstPublishedAt   DateTime?         @map("first_published_at") @db.Timestamptz(6)
+  version            Int               @default(1)
+  hidden             Boolean           @default(false)
+  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime          @default(now()) @map("updated_at") @db.Timestamptz(6)
+  book               Book              @relation(fields: [bookId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "chapters_book_id_books_id_fk")
+  volume             Volume            @relation("ChapterVolume", fields: [volumeId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "chapters_volume_id_volumes_id_fk")
+  volumeBook         Volume            @relation("ChapterVolumeBook", fields: [volumeId, bookId], references: [id, bookId], onDelete: NoAction, onUpdate: NoAction, map: "chapter_volume_book_fk")
+  chapterRevisions   ChapterRevision[]
+  readingProgress    ReadingProgress[]
+
+  @@unique([volumeId, position], map: "chapters_position_idx")
+  @@index([bookId, status], map: "chapters_book_idx")
+  @@map("chapters")
+}
+
+model Comment {
+  id        String   @id
+  userId    String   @map("user_id")
+  bookId    String   @map("book_id")
+  body      String
+  spoiler   Boolean  @default(false)
+  hidden    Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  user      User     @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "comments_user_id_user_id_fk")
+  book      Book     @relation(fields: [bookId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "comments_book_id_books_id_fk")
+
+  @@map("comments")
+}
+
+model LibraryEntry {
+  id        String   @id
+  userId    String   @map("user_id")
+  bookId    String   @map("book_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  user      User     @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "library_entries_user_id_user_id_fk")
+  book      Book     @relation(fields: [bookId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "library_entries_book_id_books_id_fk")
+
+  @@unique([userId, bookId], map: "library_user_book_idx")
+  @@map("library_entries")
+}
+
+model RateLimit {
+  key         String   @id
+  count       Int      @default(1)
+  windowStart DateTime @default(now()) @map("window_start") @db.Timestamptz(6)
+
+  @@map("rate_limits")
+}
+
+model Rating {
+  id        String   @id
+  userId    String   @map("user_id")
+  bookId    String   @map("book_id")
+  score     Int
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  user      User     @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "ratings_user_id_user_id_fk")
+  book      Book     @relation(fields: [bookId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "ratings_book_id_books_id_fk")
+
+  @@unique([userId, bookId], map: "rating_user_book_idx")
+  @@map("ratings")
+}
+
+model ReadingProgress {
+  id        String   @id
+  userId    String   @map("user_id")
+  bookId    String   @map("book_id")
+  chapterId String   @map("chapter_id")
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  user      User     @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "reading_progress_user_id_user_id_fk")
+  book      Book     @relation(fields: [bookId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "reading_progress_book_id_books_id_fk")
+  chapter   Chapter  @relation(fields: [chapterId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "reading_progress_chapter_id_chapters_id_fk")
+
+  @@unique([userId, bookId], map: "progress_user_book_idx")
+  @@map("reading_progress")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+  token     String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "session_user_id_user_id_fk")
+
+  @@unique([token], map: "session_token_unique")
+  @@map("session")
+}
+
+model User {
+  id              String            @id
+  name            String
+  email           String
+  emailVerified   Boolean           @default(false) @map("email_verified")
+  image           String?
+  role            String            @default("reader")
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime          @default(now()) @map("updated_at") @db.Timestamptz(6)
+  accounts        Account[]
+  applications    Application[]
+  auditLogs       AuditLog[]
+  books           Book[]
+  comments        Comment[]
+  libraryEntries  LibraryEntry[]
+  ratings         Rating[]
+  readingProgress ReadingProgress[]
+  sessions        Session[]
+
+  @@unique([email], map: "user_email_unique")
+  @@map("user")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@map("verification")
+}
+
+model Volume {
+  id           String    @id
+  bookId       String    @map("book_id")
+  title        String
+  position     Int
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  book         Book      @relation(fields: [bookId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "volumes_book_id_books_id_fk")
+  chapters     Chapter[] @relation("ChapterVolume")
+  bookChapters Chapter[] @relation("ChapterVolumeBook")
+
+  @@unique([bookId, position], map: "volumes_position_idx")
+  @@unique([id, bookId], map: "volume_id_book_unique")
+  @@map("volumes")
+}

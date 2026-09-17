@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useHydrated } from "@/lib/use-hydrated";
 import {
@@ -13,34 +13,65 @@ import {
   Menu,
   Search,
   ShieldCheck,
-  Sparkles,
   TrendingUp,
   X,
 } from "./icons";
 
-type ShellUser = { name: string; role: string } | null;
 export function Shell({
   children,
   user,
 }: {
   children: React.ReactNode;
-  user: ShellUser;
+  user: { name: string; role: string } | null;
 }) {
   const pathname = usePathname();
   const hydrated = useHydrated();
   const [open, setOpen] = useState(false);
+  const toggle = useRef<HTMLButtonElement>(null);
+  const drawer = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    drawer.current?.querySelector<HTMLElement>("button, a")?.focus();
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+        toggle.current?.focus();
+      }
+      if (event.key === "Tab") {
+        const nodes =
+          drawer.current?.querySelectorAll<HTMLElement>("a, button");
+        if (!nodes?.length) return;
+        const first = nodes[0],
+          last = nodes[nodes.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = previous;
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
   if (pathname.startsWith("/oku/")) return <>{children}</>;
   const links = [
     { href: "/", label: "Keşfet", icon: Compass, active: pathname === "/" },
     {
       href: "/kesfet",
-      label: "Tüm hikâyeler",
+      label: "Webnoveller",
       icon: BookOpen,
       active: pathname === "/kesfet",
     },
     {
       href: "/kesfet?sort=rating",
-      label: "Çok sevilenler",
+      label: "Sıralamalar",
       icon: TrendingUp,
       active: false,
     },
@@ -53,143 +84,142 @@ export function Shell({
   ];
   return (
     <div className="app-shell">
-      {open && (
-        <button
-          className="sidebar-backdrop"
-          aria-label="Menüyü kapat"
-          onClick={() => setOpen(false)}
-        />
-      )}
-      <aside className={cn("sidebar", open && "is-open")}>
-        <Link className="brand" href="/" onClick={() => setOpen(false)}>
-          <span className="brand-mark">
-            <BookOpen size={23} strokeWidth={1.7} />
-          </span>
-          satır<span className="brand-dot">.</span>
-        </Link>
-        <button
-          className="mobile-close icon-button"
-          aria-label="Menüyü kapat"
-          onClick={() => setOpen(false)}
-        >
-          <X size={20} />
-        </button>
-        <p className="nav-caption">HİKÂYELERİN DÜNYASI</p>
-        <nav className="main-nav">
-          {links.map(({ href, label, icon: Icon, active }) => (
-            <Link
-              key={href}
-              href={href}
-              className={cn("nav-link", active && "active")}
-              onClick={() => setOpen(false)}
-            >
-              <Icon size={19} strokeWidth={1.7} />
-              {label}
-              {active && <span className="nav-dot" />}
-            </Link>
-          ))}
-        </nav>
-        <div className="nav-divider" />
-        <p className="nav-caption">SENİN ALANIN</p>
-        <nav className="main-nav">
-          <Link
-            href="/studio"
-            className={cn(
-              "nav-link",
-              pathname.startsWith("/studio") && "active",
-            )}
-            onClick={() => setOpen(false)}
-          >
-            <Feather size={19} strokeWidth={1.7} />
-            Yazar stüdyosu
+      <header className="site-header">
+        <div className="header-inner">
+          <Link href="/" className="brand" aria-label="Satır ana sayfa">
+            <span className="brand-mark">
+              <BookOpen size={24} strokeWidth={2.5} />
+            </span>
+            satır<span className="brand-dot">.</span>
+            <span className="brand-category">WEBNOVEL</span>
           </Link>
-          {user?.role === "admin" && (
-            <Link
-              href="/admin"
-              className={cn(
-                "nav-link",
-                pathname.startsWith("/admin") && "active",
-              )}
-              onClick={() => setOpen(false)}
-            >
-              <ShieldCheck size={19} />
-              Başvurular
+          <nav className="desktop-nav" aria-label="Ana menü">
+            {links.map(({ href, label, active }) => (
+              <Link
+                key={href}
+                href={href}
+                className={cn("nav-link", active && "active")}
+                aria-current={active ? "page" : undefined}
+              >
+                {label}
+              </Link>
+            ))}
+          </nav>
+          <form action="/kesfet" className="search-box">
+            <Search size={17} />
+            <input
+              name="q"
+              aria-label="Hikâye veya yazar ara"
+              placeholder="Hikâye veya yazar ara"
+              maxLength={100}
+            />
+          </form>
+          {user ? (
+            <Link href="/hesap" className="avatar" aria-label="Hesabım">
+              {user.name.charAt(0).toLocaleUpperCase("tr-TR")}
+            </Link>
+          ) : (
+            <Link href="/giris" className="button button-dark button-small">
+              Giriş yap <ChevronRight size={14} />
             </Link>
           )}
-        </nav>
-        <div className="sidebar-bottom">
-          <div className="writer-invite">
-            <Sparkles size={23} strokeWidth={1.4} />
-            <h3>
-              Senin hikâyen
-              <br />
-              nerede başlıyor?
-            </h3>
-            <p>
-              İlk satırını yaz.
-              <br />
-              Yeni dünyalara kapı aç.
-            </p>
-            <Link href="/studio/yeni" onClick={() => setOpen(false)}>
-              Yazmaya başla <ChevronRight size={15} />
-            </Link>
-          </div>
-          <div className="sidebar-footer">
-            Her hikâye bir satırla başlar.
-            <span>© {new Date().getFullYear()} Satır</span>
-          </div>
-        </div>
-      </aside>
-      <div className="main-shell">
-        <header className="topbar">
           <button
+            ref={toggle}
             className="mobile-toggle icon-button"
             aria-label="Menüyü aç"
+            aria-expanded={open}
+            aria-controls="mobile-menu"
             disabled={!hydrated}
             onClick={() => setOpen(true)}
           >
             <Menu size={22} />
           </button>
-          <form action="/kesfet" className="search-box">
-            <Search size={18} />
-            <input
-              name="q"
-              aria-label="Hikâye veya yazar ara"
-              placeholder="Yeni bir hikâye, yeni bir dünya ara..."
-              maxLength={100}
-            />
-            <span className="search-shortcut">Keşfet</span>
-          </form>
-          <div className="topbar-actions">
-            <Link href="/studio/yeni" className="top-write">
-              <Feather size={17} />
-              Bir hikâye yaz
-            </Link>
-            <span className="topbar-divider" />
-            {user ? (
-              <Link href="/hesap" className="avatar" aria-label="Hesabım">
-                {user.name.charAt(0).toLocaleUpperCase("tr-TR")}
+        </div>
+      </header>
+      {open && (
+        <>
+          <div
+            className="sidebar-backdrop"
+            onClick={() => {
+              setOpen(false);
+              toggle.current?.focus();
+            }}
+          />
+          <div
+            ref={drawer}
+            id="mobile-menu"
+            className="mobile-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Gezinme menüsü"
+          >
+            <div className="drawer-heading">
+              <span className="footer-brand">satır.</span>
+              <button
+                className="icon-button"
+                aria-label="Menüyü kapat"
+                onClick={() => {
+                  setOpen(false);
+                  toggle.current?.focus();
+                }}
+              >
+                <X size={22} />
+              </button>
+            </div>
+            <nav>
+              {links.map(({ href, label, icon: Icon, active }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  className={cn("nav-link", active && "active")}
+                  onClick={() => setOpen(false)}
+                >
+                  <Icon size={19} />
+                  {label}
+                </Link>
+              ))}
+              <Link
+                href="/studio"
+                className="nav-link"
+                onClick={() => setOpen(false)}
+              >
+                <Feather size={19} />
+                Yazar stüdyosu
               </Link>
-            ) : (
-              <Link href="/giris" className="button button-dark button-small">
-                Giriş yap <ChevronRight size={14} />
-              </Link>
-            )}
+              {user?.role === "admin" && (
+                <Link
+                  href="/admin"
+                  className="nav-link"
+                  onClick={() => setOpen(false)}
+                >
+                  <ShieldCheck size={19} />
+                  Başvurular
+                </Link>
+              )}
+            </nav>
           </div>
-        </header>
-        <main id="main-content" className="page-content">
-          {children}
-        </main>
-        <footer className="page-footer">
+        </>
+      )}
+      <main id="main-content" className="page-content">
+        {children}
+      </main>
+      <footer className="page-footer">
+        <div>
           <Link href="/" className="footer-brand">
-            satır.
+            satır<span>.</span>
           </Link>
-          <span>Okudukça büyüyen bir dünya.</span>
-          <Link href="/hakkinda">
-            Satır hakkında <ChevronRight size={12} />
+          <p>Bir bölüm daha. Başka bir dünya.</p>
+        </div>
+        <nav aria-label="Alt menü">
+          <Link href="/studio">
+            <Feather size={15} />
+            Yazar stüdyosu
           </Link>
-        </footer>
-      </div>
+          {user?.role === "admin" && <Link href="/admin">Başvurular</Link>}
+          <Link href="/hakkinda">Hakkında</Link>
+          <span>© {new Date().getFullYear()} Satır</span>
+        </nav>
+      </footer>
     </div>
   );
 }

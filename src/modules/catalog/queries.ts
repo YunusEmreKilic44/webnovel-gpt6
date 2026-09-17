@@ -1,36 +1,39 @@
 import "server-only";
-import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { getDb } from "@/db";
-import {
-  books,
-  chapters,
-  comments,
-  libraryEntries,
-  ratings,
-  user,
-  volumes,
-} from "@/db/schema";
+import { Prisma } from "@/generated/prisma/client";
+import type { Book } from "@/db/schema";
 
-const bookColumns = {
-  id: books.id,
-  slug: books.slug,
-  title: books.title,
-  subtitle: books.subtitle,
-  description: books.description,
-  genre: books.genre,
-  cover: books.cover,
-  status: books.status,
-  storyStatus: books.storyStatus,
-  premiumStatus: books.premiumStatus,
-  authorId: books.authorId,
-  author: user.name,
-  featured: books.featured,
-  updatedAt: books.updatedAt,
-  chapterCount: sql<number>`(select count(*)::int from chapters c where c.book_id = ${books.id} and c.status = 'PUBLISHED' and c.hidden = false)`,
-  volumeCount: sql<number>`(select count(distinct c.volume_id)::int from chapters c where c.book_id = ${books.id} and c.status = 'PUBLISHED' and c.hidden = false)`,
-  averageRating: sql<number>`coalesce((select round(avg(r.score), 1)::float from ratings r where r.book_id = ${books.id}), 0)`,
-  ratingCount: sql<number>`(select count(*)::int from ratings r where r.book_id = ${books.id})`,
+export type CatalogBook = Pick<
+  Book,
+  | "id"
+  | "slug"
+  | "title"
+  | "subtitle"
+  | "description"
+  | "genre"
+  | "cover"
+  | "status"
+  | "storyStatus"
+  | "premiumStatus"
+  | "authorId"
+  | "featured"
+  | "updatedAt"
+> & {
+  author: string;
+  chapterCount: number;
+  volumeCount: number;
+  averageRating: number;
+  ratingCount: number;
 };
+const catalogColumns = Prisma.sql`
+  b.id, b.slug, b.title, b.subtitle, b.description, b.genre, b.cover, b.status,
+  b.story_status AS "storyStatus", b.premium_status AS "premiumStatus",
+  b.author_id AS "authorId", b.featured, b.updated_at AS "updatedAt", u.name AS author,
+  (SELECT count(*)::int FROM chapters c WHERE c.book_id = b.id AND c.status = 'PUBLISHED' AND NOT c.hidden) AS "chapterCount",
+  (SELECT count(DISTINCT c.volume_id)::int FROM chapters c WHERE c.book_id = b.id AND c.status = 'PUBLISHED' AND NOT c.hidden) AS "volumeCount",
+  coalesce((SELECT round(avg(r.score), 1)::float FROM ratings r WHERE r.book_id = b.id), 0) AS "averageRating",
+  (SELECT count(*)::int FROM ratings r WHERE r.book_id = b.id) AS "ratingCount"
+`;
 export async function getCatalog(
   filters: {
     q?: string;
@@ -39,124 +42,89 @@ export async function getCatalog(
     sort?: string;
   } = {},
 ) {
-  const escaped = filters.q
+  const query = filters.q
     ?.trim()
-    .replace(/[\\%_]/g, "\\$&")
-    .slice(0, 100);
-  return getDb()
-    .select(bookColumns)
-    .from(books)
-    .innerJoin(user, eq(user.id, books.authorId))
-    .where(
-      and(
-        eq(books.status, "PUBLISHED"),
-        eq(books.hidden, false),
-        filters.genre && filters.genre !== "Tümü"
-          ? eq(books.genre, filters.genre)
-          : undefined,
-        escaped
-          ? or(
-              ilike(books.title, `%${escaped}%`),
-              ilike(user.name, `%${escaped}%`),
-            )
-          : undefined,
-        filters.completed ? eq(books.storyStatus, "COMPLETED") : undefined,
-      ),
-    )
-    .orderBy(
-      filters.sort === "rating"
-        ? desc(bookColumns.averageRating)
-        : desc(books.featured),
-      desc(books.updatedAt),
-      books.id,
-    )
-    .limit(60);
+    .slice(0, 100)
+    .replace(/[\\%_]/g, "\\$&");
+  return getDb().$queryRaw<CatalogBook[]>(Prisma.sql`
+    SELECT ${catalogColumns} FROM books b JOIN "user" u ON u.id = b.author_id
+    WHERE b.status = 'PUBLISHED' AND NOT b.hidden
+    ${filters.genre && filters.genre !== "Tümü" ? Prisma.sql`AND b.genre = ${filters.genre}` : Prisma.empty}
+    ${query ? Prisma.sql`AND (b.title ILIKE ${"%" + query + "%"} OR u.name ILIKE ${"%" + query + "%"})` : Prisma.empty}
+    ${filters.completed ? Prisma.sql`AND b.story_status = 'COMPLETED'` : Prisma.empty}
+    ORDER BY ${filters.sort === "rating" ? Prisma.sql`"averageRating" DESC,` : filters.sort === "recent" ? Prisma.empty : Prisma.sql`b.featured DESC,`}
+    b.updated_at DESC, b.id LIMIT 60
+  `);
 }
-export type CatalogBook = Awaited<ReturnType<typeof getCatalog>>[number];
 export async function getPublicBook(slug: string) {
-  const [book] = await getDb()
-    .select(bookColumns)
-    .from(books)
-    .innerJoin(user, eq(user.id, books.authorId))
-    .where(
-      and(
-        eq(books.slug, slug),
-        eq(books.status, "PUBLISHED"),
-        eq(books.hidden, false),
-      ),
-    );
-  return book;
+  const rows = await getDb().$queryRaw<CatalogBook[]>(Prisma.sql`
+    SELECT ${catalogColumns} FROM books b JOIN "user" u ON u.id = b.author_id
+    WHERE b.slug = ${slug} AND b.status = 'PUBLISHED' AND NOT b.hidden
+  `);
+  return rows[0];
 }
 export async function getPublicChapters(bookId: string) {
-  return getDb()
-    .select({
-      id: chapters.id,
-      title: chapters.publishedTitle,
-      position: chapters.position,
-      volumeId: volumes.id,
-      volumeTitle: volumes.title,
-      volumePosition: volumes.position,
-      accessType: chapters.accessType,
-      priceMinor: chapters.priceMinor,
-      wordCount: chapters.publishedWordCount,
-      publishedAt: chapters.firstPublishedAt,
-    })
-    .from(chapters)
-    .innerJoin(volumes, eq(volumes.id, chapters.volumeId))
-    .where(
-      and(
-        eq(chapters.bookId, bookId),
-        eq(chapters.status, "PUBLISHED"),
-        eq(chapters.hidden, false),
-      ),
-    )
-    .orderBy(volumes.position, chapters.position);
+  const rows = await getDb().chapter.findMany({
+    where: { bookId, status: "PUBLISHED", hidden: false },
+    select: {
+      id: true,
+      publishedTitle: true,
+      position: true,
+      volumeId: true,
+      accessType: true,
+      priceMinor: true,
+      publishedWordCount: true,
+      firstPublishedAt: true,
+      volume: { select: { title: true, position: true } },
+    },
+    orderBy: [{ volume: { position: "asc" } }, { position: "asc" }],
+  });
+  return rows.map((c) => ({
+    id: c.id,
+    title: c.publishedTitle,
+    position: c.position,
+    volumeId: c.volumeId,
+    volumeTitle: c.volume.title,
+    volumePosition: c.volume.position,
+    accessType: c.accessType,
+    priceMinor: c.priceMinor,
+    wordCount: c.publishedWordCount,
+    publishedAt: c.firstPublishedAt,
+  }));
 }
 export async function getBookComments(bookId: string) {
-  return getDb()
-    .select({
-      id: comments.id,
-      body: comments.body,
-      spoiler: comments.spoiler,
-      createdAt: comments.createdAt,
-      name: user.name,
-    })
-    .from(comments)
-    .innerJoin(user, eq(user.id, comments.userId))
-    .where(and(eq(comments.bookId, bookId), eq(comments.hidden, false)))
-    .orderBy(desc(comments.createdAt))
-    .limit(30);
+  const rows = await getDb().comment.findMany({
+    where: { bookId, hidden: false },
+    select: {
+      id: true,
+      body: true,
+      spoiler: true,
+      createdAt: true,
+      user: { select: { name: true } },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 30,
+  });
+  return rows.map(({ user, ...comment }) => ({ ...comment, name: user.name }));
 }
 export async function getMyBookState(userId: string, bookId: string) {
   const [saved, rating] = await Promise.all([
-    getDb()
-      .select({ id: libraryEntries.id })
-      .from(libraryEntries)
-      .where(
-        and(
-          eq(libraryEntries.userId, userId),
-          eq(libraryEntries.bookId, bookId),
-        ),
-      ),
-    getDb()
-      .select({ score: ratings.score })
-      .from(ratings)
-      .where(and(eq(ratings.userId, userId), eq(ratings.bookId, bookId))),
+    getDb().libraryEntry.findUnique({
+      where: { userId_bookId: { userId, bookId } },
+      select: { id: true },
+    }),
+    getDb().rating.findUnique({
+      where: { userId_bookId: { userId, bookId } },
+      select: { score: true },
+    }),
   ]);
-  return { saved: saved.length > 0, score: rating[0]?.score ?? 0 };
+  return { saved: !!saved, score: rating?.score ?? 0 };
 }
 export async function getLibrary(userId: string) {
-  return getDb()
-    .select(bookColumns)
-    .from(libraryEntries)
-    .innerJoin(books, eq(books.id, libraryEntries.bookId))
-    .innerJoin(user, eq(user.id, books.authorId))
-    .where(
-      and(
-        eq(libraryEntries.userId, userId),
-        eq(books.status, "PUBLISHED"),
-        eq(books.hidden, false),
-      ),
-    )
-    .orderBy(desc(libraryEntries.createdAt));
+  return getDb().$queryRaw<CatalogBook[]>(Prisma.sql`
+    SELECT ${catalogColumns} FROM library_entries l JOIN books b ON b.id = l.book_id
+    JOIN "user" u ON u.id = b.author_id
+    WHERE l.user_id = ${userId} AND b.status = 'PUBLISHED' AND NOT b.hidden
+    ORDER BY l.created_at DESC
+  `);
 }
