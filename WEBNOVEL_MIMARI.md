@@ -18,9 +18,9 @@ Bu doküman çalışan sürümü ve platformun hedef mimarisini birlikte tanıml
 | Yazarlık | Kitap/cilt/bölüm oluşturma, Tiptap editörü, otomatik kayıt, sürüm çakışması kontrolü, taslak/canlı metin ayrımı. |
 | İnceleme | Yayın ve premium başvuru anlık görüntüleri, yönetici onay/red işlemleri ve denetim kayıtları. |
 | Topluluk | Kütüphane, bölüm bazlı okuma ilerlemesi, kitap puanı, kitap yorumu ve spoiler gizleme. |
-| Veritabanı | Prisma Client; PostgreSQL için `@prisma/adapter-pg`, yerel PGlite için `pglite-prisma-adapter`; mevcut verileri koruyan migration geçişi. |
+| Veritabanı | Prisma Client + Neon PostgreSQL + `@prisma/adapter-pg`; PGlite yalnız izole testler ve eski veri aktarımı için geliştirme bağımlılığıdır. |
 | Premium | Onay ve bölüm fiyatlandırması; eski ücretsiz bölümleri koruyan kurallar. Tahsilat ve satın alınmış erişim henüz yok. |
-| Doğrulama | 24 iş kuralı/migration testi, TypeScript ve ESLint başarılı. Önceki UI/Prisma kontrolünde 3 Playwright testi ve üretim derlemesi başarılıydı; yönetici öz değerlendirme ve otomatik yayın değişiklikleri için tam paket yeniden çalıştırılmadı. DB testleri yerel PGlite üzerinde çalıştırıldı. |
+| Doğrulama | 19 Eylül 2026: 29 Vitest testi, TypeScript, ESLint ve üretim derlemesi başarılı. Neon’da ayrı geçici veritabanıyla 5 Playwright testi geçti; kontrollü yavaş sorgularla Suspense sınırları da doğrulandı. Yerel veriler Neon’a aktarıldı ve alan değerleri doğrulandı. |
 
 Mevcut kullanıcı rolleri `reader` ve `admin` değerleridir; yazarlık kitap sahipliğiyle belirlenir. Aşağıdaki ayrıntılı rol, ödeme ve operasyon bölümleri ileride uygulanacak daha geniş modeli de içerir. Belirtilmeyen ürün davranışları **önerilen ürün kararı** olarak tasarlanmıştır.
 
@@ -237,7 +237,7 @@ Tiptap içeriği JSON olarak saklanır; yalnız izinli düğüm ve işaretler re
 
 - Tek şema kaynağı [prisma/schema.prisma](./prisma/schema.prisma) dosyasıdır. `@map` ve `@@map`, mevcut PostgreSQL tablo/kolon adlarını korur; geçiş tablo yeniden oluşturmayı gerektirmez.
 - Prisma Client `src/generated/prisma/` içine üretilir ve sürüm kontrolüne alınmaz. `npm ci` sonrasında ve üretim derlemesinden önce otomatik üretilir; elle üretim komutu `npm run db:generate` şeklindedir.
-- [src/db/index.ts](./src/db/index.ts), yeniden kullanılan Prisma istemcisini oluşturur. `DATABASE_URL` varsa PostgreSQL adaptörü; yoksa yalnız `LOCAL_DATABASE=true` koşulunda yerel PGlite adaptörü seçilir.
+- [src/db/index.ts](./src/db/index.ts), yeniden kullanılan Prisma istemcisini oluşturur. `DATABASE_URL` zorunludur ve Neon’un havuzlu PostgreSQL bağlantısını kullanır. CLI/migration bağlantısı `DATABASE_URL_UNPOOLED` üzerinden yapılır; uygulamada yerel veritabanı seçeneği yoktur.
 - Better Auth `prismaAdapter(..., { provider: "postgresql" })` kullanır. Oturum, katalog, topluluk, yayın, seed ve yönetici komutları Prisma'ya taşınmıştır. Drizzle paketleri ve eski şema/config dosyaları kaldırılmıştır.
 - Katalog istatistikleri, satır kilitleri ve atomik hız sınırı gibi SQL gerektiren işlemler Prisma'nın parametreli SQL API'sini kullanır; kullanıcı girdisi SQL metnine birleştirilmez.
 
@@ -245,13 +245,13 @@ Tiptap içeriği JSON olarak saklanır; yalnız izinli düğüm ve işaretler re
 | --- | --- |
 | `npm run db:generate` | Şemadan Prisma Client üretir; migration oluşturmaz. |
 | `npm run db:dev -- --name degisiklik_adi` | PostgreSQL geliştirme veritabanında Prisma Migrate ile yeni migration oluşturur ve uygular. |
-| `npm run db:migrate` | Kontrol edilmiş SQL migration'larını seçili ortama uygular; PostgreSQL'de `prisma migrate deploy` çağırır. |
+| `npm run db:migrate` | Kontrol edilmiş SQL migration'larını `prisma migrate deploy` ile Neon’a uygular. |
 | `npm run db:seed` | Kitap bulunmayan veritabanına örnek içerik ekler. |
 | `npm run db:admin -- kayitli@adres.com` | Var olan, doğrulanmış kullanıcıya yönetici rolü verir. |
 
-PGlite, Prisma CLI için ağ üzerinden PostgreSQL bağlantısı sunmaz. Bu yüzden [migrate-local.ts](./src/db/migrate-local.ts), aynı `prisma/migrations/` SQL dosyalarını transaction içinde çalıştırır ve standart `_prisma_migrations` geçmişini kaydeder. PGlite kullanılırken web sunucusu migration/seed/CLI işlemlerinden önce durdurulur; aynı veri klasörüne iki süreç bağlanmaz.
+PGlite yalnız izole testlerde kullanılır; [tests/support/migrate.ts](./tests/support/migrate.ts) aynı Prisma SQL migration’larını test veritabanlarına uygular. Playwright ayrı `TEST_DATABASE_URL` ile PostgreSQL kullanır. [scripts/import-local.ts](./scripts/import-local.ts), eski `.data/postgres` verilerini önce yedekler ve boş Neon veritabanına aktarır; normal uygulama bu klasörü açmaz.
 
-Eski Drizzle migration tablosu yalnız geçişin doğrulanması için okunur. Bilinen ilk iki migration'ın LF/CRLF hash'leri doğrulanır; uygulanmış dosyalar yeniden çalıştırılmadan Prisma geçmişine alınır. Tanınmayan eski geçmişte geçiş durur. Yerel Prisma migration geçmişinde eksik tamamlanma veya değişmiş checksum varsa işlem de durdurulur. SQL dosyaları `.gitattributes` ile LF satır sonuna sabitlenmiştir.
+Eski Drizzle geçiş kodu kaldırıldı. SQL dosyaları `.gitattributes` ile LF satır sonuna sabitlenmiştir; test migration yardımcısı eksik tamamlanma veya değişmiş checksum durumunda işlemi durdurur.
 
 SQL migration'larındaki kısmi benzersiz başvuru indeksi, fiyat/içerik kontrolleri ve değişmez tarih tetikleyicileri korunur. Bölümün cilt ve kitap ilişkisini doğrulayan bileşik foreign key Prisma şemasında da temsil edilir. Mevcut ilk yayın/onay zamanı güncellemede yeniden yazılmaz; eski PostgreSQL kayıtlarının mikrosaniye hassasiyeti korunur. `prisma db push`, incelenmiş migration'ların ve bu özel SQL kurallarının yerine kullanılmaz.
 
@@ -304,7 +304,6 @@ webnovel-gpt6/
 │   ├── db/
 │   │   ├── index.ts              # Prisma Client ve bağlantı adaptörleri
 │   │   ├── schema.ts             # Ortak TypeScript tipleri; ORM şeması değil
-│   │   └── migrate-local.ts      # PGlite migration ve geçmiş doğrulaması
 │   ├── generated/prisma/         # Üretilir; Git dışında
 │   ├── lib/                      # Better Auth, oturum ve yardımcılar
 │   └── modules/

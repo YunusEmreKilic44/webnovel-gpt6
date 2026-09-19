@@ -1,10 +1,7 @@
 import "dotenv/config";
 import { openDatabase } from "../src/db";
 const email = process.argv[2]?.trim().toLowerCase();
-if (!email)
-  throw new Error(
-    "Kullanım: npm run db:admin -- kayitli@adres.com (Yerel PGlite kullanırken web sunucusunu önce durdurun.)",
-  );
+if (!email) throw new Error("Kullanım: npm run db:admin -- kayitli@adres.com");
 const { db, close } = openDatabase();
 try {
   await db.$transaction(async (tx) => {

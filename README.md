@@ -2,11 +2,11 @@
 
 Anime/manga görsel kimliğine sahip, Türkçe ve metin tabanlı webnovel platformu. Next.js App Router, React, TypeScript, Prisma 7 ve PostgreSQL kullanır. Ürün kararları, çalışan kapsam ve hedef mimari: [WEBNOVEL_MIMARI.md](./WEBNOVEL_MIMARI.md).
 
-Son güncelleme: **17 Eylül 2026**. Arayüz yenilemesi ve Drizzle'dan Prisma'ya geçiş tamamlandı; mevcut yerel kitap ve kullanıcı verileri korundu.
+Son güncelleme: **19 Eylül 2026**. Uygulama Neon PostgreSQL kullanır. Yerel kitaplar, kullanıcılar ve ilişkili kayıtlar yedeklenerek Neon’a taşındı.
 
 ## Hızlı başlangıç
 
-Node.js 22.17+ ve npm gerekir. Bu çalışma alanında bağımlılıklar, yerel `.env` ve örnek veritabanı hazırlanmıştır:
+Node.js 22.17+ ve npm gerekir. Bu çalışma alanında bağımlılıklar, Neon bağlantısını içeren `.env` ve veritabanı hazırlanmıştır:
 
 ```sh
 npm run dev
@@ -20,7 +20,7 @@ Temiz bir kurulumda:
 npm ci
 ```
 
-`.env.example` dosyasını `.env` olarak kopyalayın. `BETTER_AUTH_SECRET` alanına aşağıdaki komutun ürettiği değeri yazın:
+`.env.example` dosyasını `.env` olarak kopyalayın. Neon konsolundaki havuzlu bağlantıyı `DATABASE_URL`, doğrudan bağlantıyı `DATABASE_URL_UNPOOLED` olarak ekleyin. `BETTER_AUTH_SECRET` alanına aşağıdaki komutun ürettiği değeri yazın:
 
 ```sh
 node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
@@ -31,27 +31,19 @@ npm run dev
 
 `.env` ve `.data` sürüm kontrolüne alınmaz. Hazırlanan yerel secret yalnız bu çalışma alanındadır.
 
-### Yerel veritabanı
+### Neon veritabanı
 
-`DATABASE_URL` yokken `LOCAL_DATABASE=true`, PostgreSQL'in gömülü WASM sürümü **PGlite** kullanır. Veriler `.data/postgres` altında kalıcıdır; tarayıcı kapatıldığında kaybolmaz. Bu, sunucu PostgreSQL'i olmadan yerelde ürünü denemek için eklenen geliştirme adaptörüdür.
+Uygulama yalnız `DATABASE_URL` üzerinden PostgreSQL’e bağlanır; yerel PGlite’a otomatik dönüş yoktur. Neon’un havuzlu bağlantısı uygulama sorgularında, `DATABASE_URL_UNPOOLED` ise Prisma CLI ve migration işlemlerinde kullanılır. Doğrudan URL verilmezse CLI `DATABASE_URL` kullanır. Bağlantıların TLS parametrelerini koruyun.
 
-**Aynı PGlite veri klasörünü yalnız bir süreç açmalıdır.** Migration, seed veya yönetici CLI komutlarından önce çalışan web sunucusunu durdurun. Birden fazla instance, ayrı worker ve üretim için gerçek PostgreSQL kullanın. Entegrasyon testleri ayrı, bellekteki PGlite örneğinde çalışır; yerel verinizi değiştirmez.
+Eski `.data/postgres` verileri ve `.data/neon-import-backup-*` yedekleri korunur. `npm run db:import-local` yedek alıp kayıt sayılarını gösterir; `node --import tsx scripts/import-local.ts --apply` boş ve migration uygulanmış hedefe tüm kayıtları tek transaction içinde aktarır. Önce eski PGlite sunucusunu durdurun. Hedefte kayıt varsa işlem durur; üzerine yazılmaz. Parola hash’leri ve tarih hassasiyeti korunur.
 
-### PostgreSQL ile çalıştırma
-
-```sh
-docker compose up -d postgres
-```
-
-`.env` içinde `DATABASE_URL=postgresql://satir:satir@localhost:5432/satir` ayarlayın, `LOCAL_DATABASE=false` yapın ve migration'ları uygulayın. Üretimde güçlü DB kimlik bilgileri, TLS ve yönetilen yedekler kullanın. Docker Compose ayarları yalnız yerel geliştirme içindir.
-
-PostgreSQL/üretim modunda e-posta doğrulaması zorunludur. `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `RESEND_API_KEY` ve doğrulanmış gönderen adresi olan `EMAIL_FROM` tanımlanmalıdır. `DEV_SKIP_EMAIL_VERIFICATION` yalnız localhost URL'si + yerel PGlite koşullarında etkilidir. Resend anahtarı yoksa gerçek e-posta gönderilmez. Şifre yenileme de bu servise bağlıdır.
+Geliştirmede (`npm run dev`), localhost adresinde `DEV_SKIP_EMAIL_VERIFICATION=true` kullanılabilir. Üretimde e-posta doğrulaması zorunludur; `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `RESEND_API_KEY` ve `EMAIL_FROM` tanımlanmalıdır. Şifre yenileme de e-posta servisini kullanır.
 
 ## Prisma geliştirme akışı
 
 `npm ci` ve `npm run build`, Prisma Client'ı otomatik üretir. Şema `prisma/schema.prisma` içinde, PostgreSQL bağlantısı `prisma.config.ts` ve `src/db/index.ts` içindedir. Üretilen istemci `src/generated/prisma/` altında tutulur ve Git'e eklenmez. `src/db/schema.ts` yalnız ortak TypeScript tiplerini içerir; ORM şeması değildir.
 
-PostgreSQL bağlantısı `@prisma/adapter-pg`, yerel bağlantı `pglite-prisma-adapter` kullanır. Better Auth, oturum sorguları, katalog, yayın ve topluluk işlemleri, seed ve yönetici CLI'si Prisma üzerinden çalışır. Drizzle bağımlılıkları kaldırılmıştır.
+Neon bağlantısı `@prisma/adapter-pg` kullanır. PGlite ve adaptörü yalnız geliştirme bağımlılığıdır; izole testler ve eski verilerin tek seferlik aktarımı için tutulur. Better Auth, oturum sorguları, katalog, yayın ve topluluk işlemleri, seed ve yönetici CLI'si Prisma üzerinden çalışır. Drizzle bağımlılıkları kaldırılmıştır.
 
 ```sh
 npm run db:generate
@@ -60,11 +52,13 @@ npm run db:migrate
 
 Şema değişikliğinden sonra PostgreSQL geliştirme veritabanında `npm run db:dev -- --name degisiklik_adi` kullanılır. Oluşan SQL incelenip sürüm kontrolüne alınır. `db:generate` yalnız istemci üretir, migration oluşturmaz.
 
-`db:migrate`, PostgreSQL'de Prisma Migrate kullanır. Yerel PGlite'da aynı SQL dosyaları transaction içinde uygulanıp `_prisma_migrations` tablosuna kaydedilir. Mevcut eski migration geçmişi bilinen dosya hash'leriyle doğrulanır ve uygulanmış migration'lar baseline edilir; kitaplar ve hesaplar silinmez. Tanınmayan veya değiştirilmiş geçmişte işlem durur. SQL içindeki kısmi unique index, check constraint ve değişmezlik tetikleyicileri korunur; `prisma db push` bu kuralların yerine geçmez.
+`db:migrate`, doğrudan `prisma migrate deploy` çalıştırır. Eski Drizzle geçiş kodu kaldırıldı. SQL içindeki kısmi unique index, check constraint ve değişmezlik tetikleyicileri korunur; `prisma db push` bu kuralların yerine geçmez.
 
 ## Arayüz
 
 Koyu zeminli anime/webnovel tasarımı; yatay gezinme, mobil menü, seri vitrini, türler, son güncellemeler ve gerçek değerlendirme puanlarından sıralama içerir. Kitaplar, stüdyo ve hesap ekranları aynı tasarımı kullanır. Okuyucu varsayılan olarak koyu açılır; açık ve sepya tercihleri saklanır.
+
+Menü ve sayfa iskeleti oturum sorgusunu beklemeden gönderilir. Ana sayfadaki vitrinler, keşfet sonuçları, kitap bölümleri/yorumları ve kütüphane alanları ayrı Suspense sınırlarıyla yüklenir. Ortak kitap ve bölüm sorguları yalnız aynı istek içinde paylaşılır; kullanıcı verileri istekler arasında önbelleğe alınmaz. Okuyucu, kitap ve yönetim sayfaları için yükleme iskeletleri bulunur.
 
 Yerel illüstrasyonlar: `public/art/`. Vitrin için bir geniş görsel ve yazarın seçebileceği altı kapak bulunur; Next.js Image görselleri cihaz boyutuna göre sunar. Görsel üretim bilgileri ve promptlar: [ARTWORK.md](./public/art/ARTWORK.md).
 
@@ -118,14 +112,14 @@ Bu teslim, temel yayın akışının çalışan ilk geliştirme dilimidir; mimar
 - Katalog ilk 60 sonucu, kitap yorumları son 30 yorumu gösterir; büyük katalog için cursor sayfalama gerekir.
 - Okuma ilerlemesi bölüm seviyesindedir; paragraf/scroll konumu eşitlemesi henüz yok.
 - E-posta çağrısı şu an doğrudan Resend'e yapılır; kalıcı teslim kuyruğu eklenmeden üretim bildirim garantisi verilmez.
-- Yerel doğrulama PGlite üzerinde yapılmıştır. Gerçek PostgreSQL, üretim e-posta sağlayıcısı, yedekten dönüş ve ölçek testleri ayrıca yürütülmelidir.
+- İş kuralı testleri izole PGlite üzerinde çalışır. Neon bağlantısı ve veri aktarımı ayrıca doğrulanır; üretim e-posta sağlayıcısı, yedekten dönüş ve ölçek testleri ayrı işlerdir.
 
 ## Kod yapısı
 
 ```text
 src/app/                      Next.js sayfaları ve auth route handler
 src/components/               Paylaşılan arayüz, editör, okuyucu
-src/db/                       Prisma Client, bağlantı adaptörleri ve yerel migration
+src/db/                       Prisma Client, Neon bağlantısı ve ortak tipler
 src/generated/prisma/         Otomatik üretilen istemci; Git dışında
 src/lib/                      Oturum, auth, ortak yardımcılar
 src/modules/catalog/          Güvenli katalog sorguları
@@ -134,7 +128,7 @@ src/modules/community/        Kütüphane, puan, yorum, okuma işareti
 prisma/                       Prisma şeması, SQL migration ve DB değişmezlik kısıtları
 prisma.config.ts              Prisma CLI bağlantı ve migration yapılandırması
 public/art/                   Anime illüstrasyonları ve üretim notları
-scripts/                      Migration, örnek veri ve yönetici CLI
+scripts/                      Yerel veri aktarımı, örnek veri ve yönetici CLI
 tests/                        İş kuralları ve Playwright tarayıcı testleri
 ```
 
@@ -151,13 +145,17 @@ npm run test:e2e
 npm run build
 ```
 
-`npm run test:e2e` önce üretim derlemesi alır. Playwright kendi üretim sunucusunu **localhost:3100** üzerinde ve `.data/e2e` veritabanıyla başlatır; migration, örnek veri ve test yöneticisini otomatik hazırlar. Normal geliştirme veritabanına dokunmaz. Aynı derleme klasörü kullanıldığı için testten önce normal sunucuyu durdurun. Sabit test yönetici parolası yalnız bu ayrı veritabanının fixture'ında kullanılır; normal seed'e veya üretime eklenmez. Test ekran görüntüleri ve hata izleri `test-results/` altındadır. Cache başlıkları, geliştirme sunucusunun farklı davranışı yerine üretim yanıtında doğrulanır.
+`npm run test:e2e` önce üretim derlemesi alır. Playwright, **localhost:3100** üzerinde ayrı PostgreSQL veritabanıyla çalışır. `docker compose up -d postgres-test` sonrasında `.env` içine `TEST_DATABASE_URL=postgresql://satir:satir@localhost:5433/satir_e2e` ekleyin. Veritabanı adı `_e2e` ile bitmeli ve uygulama veritabanından farklı olmalıdır. Testler Neon bağlantısına otomatik yönlenmez. CI kendi geçici PostgreSQL servisini başlatır. Migration, seed ve test yöneticisi bu ayrı veritabanında hazırlanır. Aynı derleme klasörü kullanıldığı için testten önce normal sunucuyu durdurun. Ekran görüntüleri ve izler `test-results/` altındadır.
 
-`npm test`, Prisma Client ile ayrı, geçici PGlite veritabanlarında çalışır. 21 yayın/içerik testi ilk yayın, ilk premium tarihi, yetkisiz yazma, yinelenen başvuru, taslak çakışması, güvenli metin şeması ve mikrosaniyeli tarih korumasını denetler. Yönetici kendi kitabının yayın/premium başvurusunu onaylayabilir veya reddedebilir; bu dört senaryoda yetki kontrolü, karar kaydı ve yeniden değerlendirme engeli de test edilir. Otomatik yayın testleri gerçek katalog sorgularını, incelenen sürümün korunmasını, yalnız örnek bölümlerin yayımlanmasını ve gizli/eksik bölüm varsa tüm işlemin geri alınmasını kapsar. 3 migration testi eski verilerin korunmasını, tekrar çalıştırmayı, tanınmayan geçmişi ve checksum uyuşmazlığını kapsar. Bu kontroller ayrı PostgreSQL sunucusunda üretim doğrulamasının yerine geçmez.
+`npm test`, Prisma Client ile ayrı, geçici PGlite veritabanlarında çalışır. 21 yayın/içerik testi ilk yayın, ilk premium tarihi, yetkisiz yazma, yinelenen başvuru, taslak çakışması, güvenli metin şeması ve mikrosaniyeli tarih korumasını denetler. Yönetici kendi kitabının yayın/premium başvurusunu onaylayabilir veya reddedebilir; bu dört senaryoda yetki kontrolü, karar kaydı ve yeniden değerlendirme engeli de test edilir. Otomatik yayın testleri gerçek katalog sorgularını, incelenen sürümün korunmasını, yalnız örnek bölümlerin yayımlanmasını ve gizli/eksik bölüm varsa tüm işlemin geri alınmasını kapsar. 3 migration testi kayıtların korunmasını, tekrar çalıştırmayı, tamamlanmamış geçmişi ve checksum uyuşmazlığını kapsar. 5 bağlantı/kimlik doğrulama testi eksik URL’de yerel veritabanına dönülmediğini ve geliştirme önizlemesinin üretimde açılmadığını denetler.
 
 Üretim derlemesi sonrası `npm start` ile çalıştırılabilir. Bu, eksik ödeme/moderasyon/işletim işlerinin tamamlandığı veya ürünün ticari lansmana hazır olduğu anlamına gelmez.
 
 ### Bu teslimde doğrulananlar
+
+Suspense düzenlemesi: TypeScript, ESLint, üretim derlemesi ve 29 Vitest testi başarılı. Neon’da ayrı test veritabanıyla 5 Playwright testi geçti. İki yeni test, sorguları veritabanı kilidiyle bekleterek menünün oturum/katalogdan önce, kitap ve bölüm listesinin de yorumlardan önce görünmesini doğrular.
+
+19 Eylül 2026: Neon migration’ları uygulandı; 15 kullanıcı, 8 kitap, 44 bölüm ve ilişkili kayıtlar yerel yedekten aktarılarak alan değerleri doğrulandı. TypeScript, ESLint, 29 Vitest testi ve üretim derlemesi başarılı. Neon üzerinde ayrı geçici veritabanıyla 3 Playwright testi geçti; test veritabanı ardından kaldırıldı. Aktarılan kitap, ana sayfa, keşif, okuyucu ve giriş/kayıt sayfaları gerçek uygulama bağlantısıyla kontrol edildi. Taslak kaydından hemen sonraki yayında eski sürüm gönderilmesi düzeltildi.
 
 17 Eylül 2026: Anime/webnovel arayüzü ve Prisma geçişi tamamlandı. TypeScript, ESLint ve üretim derlemesi geçti. İlk kontrolde 17 iş kuralı/migration testi ile 3 Playwright üretim tarayıcı testi başarılı. Kayıt, kütüphane, puan/yorum, otomatik kayıt, yönetici onayı, premium onayı, eski/yeni bölüm fiyatlandırması ve HTML/RSC içerik sınırı uçtan uca kontrol edildi. Masaüstü ve mobil ekran görüntüleri incelendi; kapakların yüklendiği, yatay taşma olmadığı ve mobil menünün klavye davranışı doğrulandı. Mevcut yerel veritabanı veri silinmeden Prisma migration geçmişine geçirildi. `npm audit` sonucu: 0 bilinen açık. GitHub Actions akışı eklendi; uzak CI çalıştırması bu yerel doğrulamanın parçası değildir.
 

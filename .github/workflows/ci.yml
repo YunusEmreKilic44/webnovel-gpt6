@@ -7,8 +7,23 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: satir
+          POSTGRES_PASSWORD: satir
+          POSTGRES_DB: satir_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U satir -d satir_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       NEXT_TELEMETRY_DISABLED: "1"
+      TEST_DATABASE_URL: "postgresql://satir:satir@localhost:5432/satir_e2e"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

@@ -6,23 +6,25 @@ import { cn } from "@/lib/utils";
 import { useHydrated } from "@/lib/use-hydrated";
 import {
   BookOpen,
-  ChevronRight,
   Compass,
   Feather,
   Library,
   Menu,
   Search,
-  ShieldCheck,
   TrendingUp,
   X,
 } from "./icons";
 
 export function Shell({
   children,
-  user,
+  account,
+  mobileAdmin,
+  footerAdmin,
 }: {
   children: React.ReactNode;
-  user: { name: string; role: string } | null;
+  account: React.ReactNode;
+  mobileAdmin: React.ReactNode;
+  footerAdmin: React.ReactNode;
 }) {
   const pathname = usePathname();
   const hydrated = useHydrated();
@@ -114,15 +116,7 @@ export function Shell({
               maxLength={100}
             />
           </form>
-          {user ? (
-            <Link href="/hesap" className="avatar" aria-label="Hesabım">
-              {user.name.charAt(0).toLocaleUpperCase("tr-TR")}
-            </Link>
-          ) : (
-            <Link href="/giris" className="button button-dark button-small">
-              Giriş yap <ChevronRight size={14} />
-            </Link>
-          )}
+          {account}
           <button
             ref={toggle}
             className="mobile-toggle icon-button"
@@ -186,16 +180,7 @@ export function Shell({
                 <Feather size={19} />
                 Yazar stüdyosu
               </Link>
-              {user?.role === "admin" && (
-                <Link
-                  href="/admin"
-                  className="nav-link"
-                  onClick={() => setOpen(false)}
-                >
-                  <ShieldCheck size={19} />
-                  Başvurular
-                </Link>
-              )}
+              <div onClick={() => setOpen(false)}>{mobileAdmin}</div>
             </nav>
           </div>
         </>
@@ -215,7 +200,7 @@ export function Shell({
             <Feather size={15} />
             Yazar stüdyosu
           </Link>
-          {user?.role === "admin" && <Link href="/admin">Başvurular</Link>}
+          {footerAdmin}
           <Link href="/hakkinda">Hakkında</Link>
           <span>© {new Date().getFullYear()} Satır</span>
         </nav>

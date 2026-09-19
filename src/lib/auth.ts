@@ -2,17 +2,8 @@ import "server-only";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { getDb } from "@/db";
-
-export function isLocalPreview() {
-  const hostname = new URL(
-    process.env.BETTER_AUTH_URL || "http://localhost:3000",
-  ).hostname;
-  return (
-    process.env.LOCAL_DATABASE === "true" &&
-    !process.env.DATABASE_URL &&
-    ["localhost", "127.0.0.1"].includes(hostname)
-  );
-}
+import { isLocalPreview } from "./auth-preview";
+export { isLocalPreview } from "./auth-preview";
 async function sendEmail(to: string, subject: string, url: string) {
   if (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM)
     throw new Error("E-posta servisi henüz yapılandırılmadı.");

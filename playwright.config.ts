@@ -1,5 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 import { randomBytes } from "node:crypto";
+import { testDatabaseUrl } from "./tests/e2e/environment";
+const databaseUrl = testDatabaseUrl();
 export default defineConfig({
   testDir: "./tests/e2e",
   testMatch: "**/*.spec.ts",
@@ -28,9 +30,10 @@ export default defineConfig({
     reuseExistingServer: false,
     timeout: 180000,
     env: {
-      DATABASE_URL: "",
-      LOCAL_DATABASE: "true",
-      PGLITE_PATH: ".data/e2e",
+      DATABASE_URL: databaseUrl,
+      DATABASE_URL_UNPOOLED: databaseUrl,
+      TEST_DATABASE_URL: databaseUrl,
+      E2E_TEST: "true",
       BETTER_AUTH_URL: "http://localhost:3100",
       BETTER_AUTH_SECRET: randomBytes(32).toString("hex"),
       DEV_SKIP_EMAIL_VERIFICATION: "true",

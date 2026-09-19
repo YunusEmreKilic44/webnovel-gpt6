@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   devIndicators: false,
-  serverExternalPackages: ["@electric-sql/pglite", "pg"],
+  serverExternalPackages: ["pg"],
   experimental: { serverActions: { bodySizeLimit: "1mb" } },
   async headers() {
     return [

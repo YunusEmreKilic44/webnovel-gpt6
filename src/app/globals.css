@@ -2081,6 +2081,71 @@ img {
     padding-inline: 22px;
   }
 }
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.skeleton {
+  display: block;
+  border-radius: 5px;
+  background: #ffffff0d;
+  animation: skeleton-pulse 1.8s ease-in-out infinite;
+}
+.skeleton-line {
+  height: 14px;
+  margin-block: 14px;
+  width: 100%;
+}
+.skeleton-line:nth-child(even),
+.skeleton-short {
+  width: 65%;
+}
+.skeleton-title {
+  width: min(420px, 85%);
+  height: 46px;
+  margin-block: 22px;
+}
+.skeleton-cover {
+  aspect-ratio: 2 / 3;
+  width: 100%;
+}
+.skeleton-button {
+  display: inline-block;
+  width: 118px;
+  height: 38px;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+.skeleton-hero .hero-copy {
+  width: min(505px, 100%);
+}
+.loading-block {
+  padding-block: 12px;
+}
+.loading-block .skeleton-line {
+  min-height: 34px;
+}
+.page-loading {
+  min-height: 55vh;
+  padding-block: 24px;
+}
+.reader-loading {
+  max-width: 800px;
+  padding: 40px 24px;
+  margin: auto;
+}
+@keyframes skeleton-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

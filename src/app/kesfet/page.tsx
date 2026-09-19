@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import { BookGridSkeleton } from "@/components/loading-skeletons";
 import Link from "next/link";
 import { BookCard } from "@/components/book-card";
 import { BookOpen, Search } from "@/components/icons";
@@ -14,7 +16,6 @@ export default async function Discover({
   const genre = typeof params.genre === "string" ? params.genre : "Tümü";
   const sort = typeof params.sort === "string" ? params.sort : "recent";
   const completed = params.completed === "true";
-  const books = await getCatalog({ q, genre, sort, completed });
   return (
     <div className="catalog-page">
       <div className="page-heading">
@@ -70,6 +71,25 @@ export default async function Discover({
           Ara
         </button>
       </form>
+      <Suspense
+        key={JSON.stringify([q, genre, sort, completed])}
+        fallback={<BookGridSkeleton />}
+      >
+        <CatalogResults filters={{ q, genre, sort, completed }} />
+      </Suspense>
+    </div>
+  );
+}
+
+async function CatalogResults({
+  filters,
+}: {
+  filters: Parameters<typeof getCatalog>[0];
+}) {
+  const books = await getCatalog(filters);
+  const q = filters?.q;
+  return (
+    <>
       <p className="catalog-count">
         {books.length} hikâye{" "}
         {q ? `· “${q}” için sonuçlar` : "keşfedilmeyi bekliyor"}
@@ -94,6 +114,6 @@ export default async function Discover({
           </Link>
         </div>
       )}
-    </div>
+    </>
   );
 }

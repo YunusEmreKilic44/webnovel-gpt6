@@ -1,7 +1,12 @@
 import "dotenv/config";
 import { hashPassword } from "better-auth/crypto";
 import { openDatabase } from "../../src/db";
-if (process.env.PGLITE_PATH !== ".data/e2e")
+if (
+  process.env.E2E_TEST !== "true" ||
+  !process.env.DATABASE_URL ||
+  process.env.DATABASE_URL !== process.env.TEST_DATABASE_URL ||
+  !new URL(process.env.DATABASE_URL).pathname.endsWith("_e2e")
+)
   throw new Error("Bu fixture yalnız ayrı E2E veritabanında çalıştırılır.");
 const { db, close } = openDatabase();
 try {

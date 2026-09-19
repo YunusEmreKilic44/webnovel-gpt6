@@ -34,10 +34,12 @@ export function SubmitButton({
   );
 }
 export function ActionForm({
+  id,
   action,
   children,
   className,
 }: {
+  id?: string;
   action: FormAction;
   children: React.ReactNode;
   className?: string;
@@ -48,7 +50,7 @@ export function ActionForm({
     if (state.ok && state.href) router.push(state.href);
   }, [state, router]);
   return (
-    <form action={formAction} className={className}>
+    <form id={id} action={formAction} className={className}>
       {children}
       {state.message && (
         <p

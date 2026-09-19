@@ -1,3 +1,8 @@
+import { Suspense } from "react";
+import {
+  BlockSkeleton,
+  BookGridSkeleton,
+} from "@/components/loading-skeletons";
 import Link from "next/link";
 import { requireUser } from "@/lib/session";
 import { getLibrary } from "@/modules/catalog/queries";
@@ -5,20 +10,7 @@ import { getDb } from "@/db";
 import { BookCard } from "@/components/book-card";
 import { ArrowRight, Library } from "@/components/icons";
 export const metadata = { title: "Kütüphanem", robots: { index: false } };
-export default async function MyLibrary() {
-  const actor = await requireUser();
-  const [saved, progress] = await Promise.all([
-    getLibrary(actor.id),
-    getDb().readingProgress.findMany({
-      where: {
-        userId: actor.id,
-        book: { status: "PUBLISHED", hidden: false },
-        chapter: { status: "PUBLISHED", hidden: false },
-      },
-      select: { chapterId: true, book: { select: { title: true } } },
-      orderBy: { updatedAt: "desc" },
-    }),
-  ]);
+export default function MyLibrary() {
   return (
     <>
       <div className="page-heading">
@@ -32,6 +24,33 @@ export default async function MyLibrary() {
           <p>Biriktirdiğin dünyalar, dönüp geldiğin hikâyeler.</p>
         </div>
       </div>
+      <Suspense
+        fallback={
+          <BlockSkeleton label="Okuma ilerlemesi yükleniyor" rows={2} />
+        }
+      >
+        <ReadingProgress />
+      </Suspense>
+      <Suspense fallback={<BookGridSkeleton />}>
+        <SavedBooks />
+      </Suspense>
+    </>
+  );
+}
+
+async function ReadingProgress() {
+  const actor = await requireUser();
+  const progress = await getDb().readingProgress.findMany({
+    where: {
+      userId: actor.id,
+      book: { status: "PUBLISHED", hidden: false },
+      chapter: { status: "PUBLISHED", hidden: false },
+    },
+    select: { chapterId: true, book: { select: { title: true } } },
+    orderBy: { updatedAt: "desc" },
+  });
+  return (
+    <>
       {progress.length > 0 && (
         <section className="stack" style={{ marginBottom: 30 }}>
           {progress.map((p) => (
@@ -46,6 +65,14 @@ export default async function MyLibrary() {
           ))}
         </section>
       )}
+    </>
+  );
+}
+async function SavedBooks() {
+  const actor = await requireUser();
+  const saved = await getLibrary(actor.id);
+  return (
+    <>
       {saved.length ? (
         <div className="book-grid">
           {saved.map((book) => (

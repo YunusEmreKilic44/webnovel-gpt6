@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { getDb } from "@/db";
 import { Prisma } from "@/generated/prisma/client";
 import type { Book } from "@/db/schema";
@@ -56,14 +57,14 @@ export async function getCatalog(
     b.updated_at DESC, b.id LIMIT 60
   `);
 }
-export async function getPublicBook(slug: string) {
+export const getPublicBook = cache(async (slug: string) => {
   const rows = await getDb().$queryRaw<CatalogBook[]>(Prisma.sql`
     SELECT ${catalogColumns} FROM books b JOIN "user" u ON u.id = b.author_id
     WHERE b.slug = ${slug} AND b.status = 'PUBLISHED' AND NOT b.hidden
   `);
   return rows[0];
-}
-export async function getPublicChapters(bookId: string) {
+});
+export const getPublicChapters = cache(async (bookId: string) => {
   const rows = await getDb().chapter.findMany({
     where: { bookId, status: "PUBLISHED", hidden: false },
     select: {
@@ -91,7 +92,7 @@ export async function getPublicChapters(bookId: string) {
     wordCount: c.publishedWordCount,
     publishedAt: c.firstPublishedAt,
   }));
-}
+});
 export async function getBookComments(bookId: string) {
   const rows = await getDb().comment.findMany({
     where: { bookId, hidden: false },

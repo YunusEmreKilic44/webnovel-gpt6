@@ -1,8 +1,9 @@
 import { beforeAll, afterAll, describe, expect, it, vi } from "vitest";
 import { PGlite } from "@electric-sql/pglite";
 import type { ApplicationSnapshot } from "@/db/schema";
-import { migrateLocal } from "@/db/migrate-local";
-import { createLocalDatabase, getDb } from "@/db";
+import { migrateLocal } from "./support/migrate";
+import { createLocalDatabase } from "./support/database";
+import { getDb } from "@/db";
 import {
   getCatalog,
   getPublicBook,

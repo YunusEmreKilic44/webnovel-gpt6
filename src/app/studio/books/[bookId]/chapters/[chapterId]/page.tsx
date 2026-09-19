@@ -68,9 +68,11 @@ export default async function EditChapter({
                 ? "İlk yayında incelemeye gönderdiğin onaylı sürüm açılır. Daha sonraki taslak değişiklikleri ayrı korunur."
                 : "Kaydettiğin sürümü yayımla. Mevcut bir bölümün ilk yayın tarihi düzenlemeyle değişmez."}
           </p>
-          <ActionForm action={publishChapterAction}>
+          <ActionForm
+            id={`publish-chapter-${chapter.id}`}
+            action={publishChapterAction}
+          >
             <input type="hidden" name="chapterId" value={chapterId} />
-            <input type="hidden" name="version" value={chapter.version} />
             <SubmitButton
               disabled={!["APPROVED", "PUBLISHED"].includes(book.status)}
             >

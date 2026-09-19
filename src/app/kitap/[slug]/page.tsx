@@ -1,3 +1,6 @@
+import { cache, Suspense } from "react";
+import { BlockSkeleton, ButtonSkeleton } from "@/components/loading-skeletons";
+import type { CatalogBook } from "@/modules/catalog/queries";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -36,18 +39,6 @@ export async function generateMetadata({ params }: Props) {
 export default async function BookDetail({ params }: Props) {
   const book = await getPublicBook((await params).slug);
   if (!book) notFound();
-  const [chapters, comments, actor] = await Promise.all([
-    getPublicChapters(book.id),
-    getBookComments(book.id),
-    getCurrentUser(),
-  ]);
-  const state = actor
-    ? await getMyBookState(actor.id, book.id)
-    : { saved: false, score: 0 };
-  const groups = [...new Set(chapters.map((c) => c.volumeId))].map((id) => ({
-    first: chapters.find((c) => c.volumeId === id)!,
-    chapters: chapters.filter((c) => c.volumeId === id),
-  }));
   return (
     <>
       <div className="breadcrumbs">
@@ -105,34 +96,16 @@ export default async function BookDetail({ params }: Props) {
             <span>Türkçe</span>
           </div>
           <div className="button-row">
-            {chapters[0] && (
-              <Link
-                className="button button-dark"
-                href={`/oku/${chapters[0].id}`}
-              >
-                <BookOpen size={15} />
-                Okumaya başla <ArrowRight size={15} />
-              </Link>
-            )}
-            {actor ? (
-              <ActionForm action={interactAction}>
-                <input type="hidden" name="bookId" value={book.id} />
-                <input
-                  type="hidden"
-                  name="intent"
-                  value={state.saved ? "unsave" : "save"}
-                />
-                <SubmitButton className="button-outline">
-                  {state.saved ? <Check size={15} /> : <Bookmark size={15} />}
-                  {state.saved ? "Kütüphanemde" : "Kütüphaneme ekle"}
-                </SubmitButton>
-              </ActionForm>
-            ) : (
-              <Link className="button button-outline" href="/giris">
-                <Bookmark size={15} />
-                Kütüphaneme ekle
-              </Link>
-            )}
+            <Suspense
+              fallback={<ButtonSkeleton label="Okuma bağlantısı yükleniyor" />}
+            >
+              <ReadLink bookId={book.id} />
+            </Suspense>
+            <Suspense
+              fallback={<ButtonSkeleton label="Kütüphane durumu yükleniyor" />}
+            >
+              <SaveBook bookId={book.id} />
+            </Suspense>
           </div>
         </div>
       </section>
@@ -152,133 +125,25 @@ export default async function BookDetail({ params }: Props) {
       <div className="split-layout">
         <div>
           <section id="bolumler">
-            {groups.map(({ first, chapters: items }) => (
-              <details className="chapter-group" open key={first.volumeId}>
-                <summary>
-                  <ChevronDown size={14} />
-                  Cilt {first.volumePosition} · {first.volumeTitle}
-                  <small>{items.length} bölüm</small>
-                </summary>
-                {items.map((c) => (
-                  <Link
-                    href={`/oku/${c.id}`}
-                    className="chapter-row"
-                    key={c.id}
-                  >
-                    <span className="chapter-position">
-                      {String(c.position).padStart(2, "0")}
-                    </span>
-                    <span>{c.title}</span>
-                    <small>
-                      {Math.max(1, Math.ceil(c.wordCount / 200))} dk
-                    </small>
-                    {c.accessType === "PAID" ? (
-                      <span className="label-pill amber">
-                        <LockKeyhole size={11} />
-                        {money(c.priceMinor)}
-                      </span>
-                    ) : (
-                      <ChevronRight size={14} />
-                    )}
-                  </Link>
-                ))}
-              </details>
-            ))}
+            <Suspense
+              fallback={<BlockSkeleton label="Bölümler yükleniyor" rows={6} />}
+            >
+              <ChapterList bookId={book.id} />
+            </Suspense>
           </section>
           <section id="yorumlar">
             <div className="comments-heading">
               <h2>Satır aralarında buluşalım.</h2>
               <MessageCircle size={20} className="muted" />
             </div>
-            {actor && actor.id !== book.authorId && (
-              <div className="panel" style={{ marginBottom: 18 }}>
-                <h3>Bu hikâyeye kaç yıldız verirsin?</h3>
-                <ActionForm action={interactAction} className="rating-form">
-                  <input type="hidden" name="bookId" value={book.id} />
-                  <input type="hidden" name="intent" value="rate" />
-                  <div className="rating-options">
-                    {[1, 2, 3, 4, 5].map((n) => (
-                      <label key={n}>
-                        <input
-                          type="radio"
-                          name="score"
-                          value={n}
-                          defaultChecked={state.score === n}
-                          required
-                          aria-label={`${n} yıldız`}
-                        />
-                        <span>
-                          {n}
-                          <Star size={14} fill="currentColor" />
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                  <SubmitButton className="button-outline button-small">
-                    Puan ver
-                  </SubmitButton>
-                </ActionForm>
-              </div>
-            )}
-            {actor ? (
-              <ActionForm action={interactAction} className="form-stack">
-                <input type="hidden" name="bookId" value={book.id} />
-                <input type="hidden" name="intent" value="comment" />
-                <label className="field">
-                  Sen ne düşünüyorsun?
-                  <textarea
-                    name="body"
-                    placeholder="Hikâyenin sende bıraktıklarını paylaş…"
-                    required
-                    minLength={3}
-                    maxLength={2000}
-                  />
-                </label>
-                <div
-                  className="button-row"
-                  style={{ justifyContent: "space-between" }}
-                >
-                  <label className="check-field">
-                    <input type="checkbox" name="spoiler" />
-                    Yorumum spoiler içeriyor
-                  </label>
-                  <SubmitButton className="button-dark button-small">
-                    Yorumu paylaş
-                  </SubmitButton>
-                </div>
-              </ActionForm>
-            ) : (
-              <div className="notice">
-                Düşüncelerini paylaşmak ve puan vermek için{" "}
-                <Link href="/giris" style={{ textDecoration: "underline" }}>
-                  giriş yap
-                </Link>
-                .
-              </div>
-            )}
-            <div style={{ marginTop: 20 }}>
-              {comments.map((comment) => (
-                <article className="comment" key={comment.id}>
-                  <span className="small-avatar">{comment.name.charAt(0)}</span>
-                  <div className="comment-body">
-                    <div className="comment-meta">
-                      <strong>{comment.name}</strong>
-                      <time dateTime={comment.createdAt.toISOString()}>
-                        {date(comment.createdAt)}
-                      </time>
-                    </div>
-                    {comment.spoiler ? (
-                      <details>
-                        <summary>Spoiler içeriyor · Görmek için aç</summary>
-                        <p>{comment.body}</p>
-                      </details>
-                    ) : (
-                      <p>{comment.body}</p>
-                    )}
-                  </div>
-                </article>
-              ))}
-            </div>
+            <Suspense
+              fallback={<BlockSkeleton label="Yorum alanı yükleniyor" />}
+            >
+              <CommunityForms book={book} />
+            </Suspense>
+            <Suspense fallback={<BlockSkeleton label="Yorumlar yükleniyor" />}>
+              <Comments bookId={book.id} />
+            </Suspense>
           </section>
         </div>
         <aside className="stack">
@@ -303,5 +168,190 @@ export default async function BookDetail({ params }: Props) {
         </aside>
       </div>
     </>
+  );
+}
+
+const getBookInteraction = cache(async (bookId: string) => {
+  const actor = await getCurrentUser();
+  const state = actor
+    ? await getMyBookState(actor.id, bookId)
+    : { saved: false, score: 0 };
+  return { actor, state };
+});
+async function ReadLink({ bookId }: { bookId: string }) {
+  const chapters = await getPublicChapters(bookId);
+  return (
+    <>
+      {chapters[0] && (
+        <Link className="button button-dark" href={`/oku/${chapters[0].id}`}>
+          <BookOpen size={15} />
+          Okumaya başla <ArrowRight size={15} />
+        </Link>
+      )}
+    </>
+  );
+}
+async function SaveBook({ bookId }: { bookId: string }) {
+  const { actor, state } = await getBookInteraction(bookId);
+  return (
+    <>
+      {actor ? (
+        <ActionForm action={interactAction}>
+          <input type="hidden" name="bookId" value={bookId} />
+          <input
+            type="hidden"
+            name="intent"
+            value={state.saved ? "unsave" : "save"}
+          />
+          <SubmitButton className="button-outline">
+            {state.saved ? <Check size={15} /> : <Bookmark size={15} />}
+            {state.saved ? "Kütüphanemde" : "Kütüphaneme ekle"}
+          </SubmitButton>
+        </ActionForm>
+      ) : (
+        <Link className="button button-outline" href="/giris">
+          <Bookmark size={15} />
+          Kütüphaneme ekle
+        </Link>
+      )}
+    </>
+  );
+}
+async function ChapterList({ bookId }: { bookId: string }) {
+  const chapters = await getPublicChapters(bookId);
+  const groups = [...new Set(chapters.map((c) => c.volumeId))].map((id) => ({
+    first: chapters.find((c) => c.volumeId === id)!,
+    chapters: chapters.filter((c) => c.volumeId === id),
+  }));
+  return (
+    <>
+      {groups.map(({ first, chapters: items }) => (
+        <details className="chapter-group" open key={first.volumeId}>
+          <summary>
+            <ChevronDown size={14} />
+            Cilt {first.volumePosition} · {first.volumeTitle}
+            <small>{items.length} bölüm</small>
+          </summary>
+          {items.map((c) => (
+            <Link href={`/oku/${c.id}`} className="chapter-row" key={c.id}>
+              <span className="chapter-position">
+                {String(c.position).padStart(2, "0")}
+              </span>
+              <span>{c.title}</span>
+              <small>{Math.max(1, Math.ceil(c.wordCount / 200))} dk</small>
+              {c.accessType === "PAID" ? (
+                <span className="label-pill amber">
+                  <LockKeyhole size={11} />
+                  {money(c.priceMinor)}
+                </span>
+              ) : (
+                <ChevronRight size={14} />
+              )}
+            </Link>
+          ))}
+        </details>
+      ))}
+    </>
+  );
+}
+async function CommunityForms({ book }: { book: CatalogBook }) {
+  const { actor, state } = await getBookInteraction(book.id);
+  return (
+    <>
+      {actor && actor.id !== book.authorId && (
+        <div className="panel" style={{ marginBottom: 18 }}>
+          <h3>Bu hikâyeye kaç yıldız verirsin?</h3>
+          <ActionForm action={interactAction} className="rating-form">
+            <input type="hidden" name="bookId" value={book.id} />
+            <input type="hidden" name="intent" value="rate" />
+            <div className="rating-options">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <label key={n}>
+                  <input
+                    type="radio"
+                    name="score"
+                    value={n}
+                    defaultChecked={state.score === n}
+                    required
+                    aria-label={`${n} yıldız`}
+                  />
+                  <span>
+                    {n}
+                    <Star size={14} fill="currentColor" />
+                  </span>
+                </label>
+              ))}
+            </div>
+            <SubmitButton className="button-outline button-small">
+              Puan ver
+            </SubmitButton>
+          </ActionForm>
+        </div>
+      )}
+      {actor ? (
+        <ActionForm action={interactAction} className="form-stack">
+          <input type="hidden" name="bookId" value={book.id} />
+          <input type="hidden" name="intent" value="comment" />
+          <label className="field">
+            Sen ne düşünüyorsun?
+            <textarea
+              name="body"
+              placeholder="Hikâyenin sende bıraktıklarını paylaş…"
+              required
+              minLength={3}
+              maxLength={2000}
+            />
+          </label>
+          <div
+            className="button-row"
+            style={{ justifyContent: "space-between" }}
+          >
+            <label className="check-field">
+              <input type="checkbox" name="spoiler" />
+              Yorumum spoiler içeriyor
+            </label>
+            <SubmitButton className="button-dark button-small">
+              Yorumu paylaş
+            </SubmitButton>
+          </div>
+        </ActionForm>
+      ) : (
+        <div className="notice">
+          Düşüncelerini paylaşmak ve puan vermek için{" "}
+          <Link href="/giris" style={{ textDecoration: "underline" }}>
+            giriş yap
+          </Link>
+          .
+        </div>
+      )}
+    </>
+  );
+}
+async function Comments({ bookId }: { bookId: string }) {
+  const comments = await getBookComments(bookId);
+  return (
+    <div style={{ marginTop: 20 }}>
+      {comments.map((comment) => (
+        <article className="comment" key={comment.id}>
+          <span className="small-avatar">{comment.name.charAt(0)}</span>
+          <div className="comment-body">
+            <div className="comment-meta">
+              <strong>{comment.name}</strong>
+              <time dateTime={comment.createdAt.toISOString()}>
+                {date(comment.createdAt)}
+              </time>
+            </div>
+            {comment.spoiler ? (
+              <details>
+                <summary>Spoiler içeriyor · Görmek için aç</summary>
+                <p>{comment.body}</p>
+              </details>
+            ) : (
+              <p>{comment.body}</p>
+            )}
+          </div>
+        </article>
+      ))}
+    </div>
   );
 }

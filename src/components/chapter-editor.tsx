@@ -9,7 +9,6 @@ import {
 import { EditorContent, useEditor, type JSONContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
-import { useRouter } from "next/navigation";
 import { saveChapterAction } from "@/modules/publishing/actions";
 import { initialActionState } from "@/lib/action-state";
 import { wordCount } from "@/modules/publishing/content";
@@ -35,10 +34,9 @@ export function ChapterEditor({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("Tüm değişiklikler kaydedildi.");
-  const version = useRef(chapter.version);
+  const [version, setVersion] = useState(chapter.version);
   const changes = useRef(0);
   const inFlight = useRef(false);
-  const router = useRouter();
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -74,14 +72,13 @@ export function ChapterEditor({
     form.set("chapterId", chapter.id);
     form.set("title", title);
     form.set("content", JSON.stringify(content));
-    form.set("version", String(version.current));
+    form.set("version", String(version));
     try {
       const result = await saveChapterAction(initialActionState, form);
       if (result.ok && result.version) {
-        version.current = result.version;
+        setVersion(result.version);
         setMessage("Taslak kaydedildi.");
         if (changes.current === revisionAtSave) setDirty(false);
-        router.refresh();
       } else setError(result.message);
     } catch {
       setError(
@@ -91,7 +88,7 @@ export function ChapterEditor({
       inFlight.current = false;
       setPending(false);
     }
-  }, [chapter.id, content, dirty, error, router, title]);
+  }, [chapter.id, content, dirty, error, title, version]);
   useEffect(() => {
     if (!dirty || pending || error) return;
     const timer = setTimeout(() => {
@@ -110,6 +107,13 @@ export function ChapterEditor({
   }, [dirty, pending]);
   return (
     <div>
+      {/* Publish the saved revision without waiting for server props to refresh. */}
+      <input
+        type="hidden"
+        name="version"
+        value={version}
+        form={`publish-chapter-${chapter.id}`}
+      />
       <label className="field" style={{ marginBottom: 20 }}>
         Bölüm başlığı
         <input

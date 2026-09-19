@@ -1,17 +1,13 @@
 services:
-  postgres:
+  postgres-test:
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: satir
       POSTGRES_PASSWORD: satir
-      POSTGRES_DB: satir
+      POSTGRES_DB: satir_e2e
     ports:
-      - "127.0.0.1:5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - "127.0.0.1:5433:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U satir -d satir"]
+      test: ["CMD-SHELL", "pg_isready -U satir -d satir_e2e"]
       interval: 5s
       retries: 10
-volumes:
-  postgres_data:

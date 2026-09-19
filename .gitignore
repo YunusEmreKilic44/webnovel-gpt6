@@ -9,3 +9,4 @@ playwright-report/
 *.tsbuildinfo
 *.log
 src/generated/prisma/
+.neon

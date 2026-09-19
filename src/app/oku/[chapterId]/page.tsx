@@ -63,28 +63,29 @@ export default async function ReadChapter({
     entry.chapter.status !== "PUBLISHED"
   )
     notFound();
-  const [allChapters, actor, cookieStore] = await Promise.all([
+  // Start the authorized public body query alongside navigation and session data.
+  const bodyPromise = canReadPublic(entry.book, entry.chapter)
+    ? db.chapter.findFirst({
+        where: {
+          id: chapterId,
+          accessType: "FREE",
+          status: "PUBLISHED",
+          hidden: false,
+          book: { status: "PUBLISHED", hidden: false },
+        },
+        select: { publishedContent: true },
+      })
+    : Promise.resolve(null);
+  const [allChapters, actor, cookieStore, body] = await Promise.all([
     getPublicChapters(entry.book.id),
     getCurrentUser(),
     cookies(),
+    bodyPromise,
   ]);
   const index = allChapters.findIndex((c) => c.id === chapterId);
   const metadata = allChapters[index];
   if (!metadata) notFound();
-  let content = null;
-  if (canReadPublic(entry.book, entry.chapter)) {
-    const body = await db.chapter.findFirst({
-      where: {
-        id: chapterId,
-        accessType: "FREE",
-        status: "PUBLISHED",
-        hidden: false,
-        book: { status: "PUBLISHED", hidden: false },
-      },
-      select: { publishedContent: true },
-    });
-    content = (body?.publishedContent as JSONContent | null) ?? null;
-  }
+  const content = (body?.publishedContent as JSONContent | null) ?? null;
   const storedTheme = cookieStore.get("reader-theme")?.value;
   const theme =
     storedTheme === "paper" || storedTheme === "sepia" ? storedTheme : "dark";
