@@ -1,25 +1,9 @@
+import { Suspense } from "react";
 import Link from "next/link";
-import { getDb } from "@/db";
-import { requireUser } from "@/lib/session";
-import { BookCover } from "@/components/book-cover";
-import { ChevronRight, Feather, Plus } from "@/components/icons";
-const labels: Record<string, string> = {
-  DRAFT: "Taslak",
-  APPROVED: "Yayın onaylandı",
-  PUBLISHED: "Yayında",
-  ARCHIVED: "Arşivlendi",
-};
-export default async function Studio() {
-  const actor = await requireUser();
-  const rows = await getDb().book.findMany({
-    where: { authorId: actor.id },
-    include: { _count: { select: { chapters: true } } },
-    orderBy: { updatedAt: "desc" },
-  });
-  const myBooks = rows.map(({ _count, ...book }) => ({
-    book,
-    count: _count.chapters,
-  }));
+import { Plus } from "@/components/icons";
+import { BlockSkeleton } from "@/components/loading-skeletons";
+import { StudioGreeting, StudioBooks } from "./sections";
+export default function Studio() {
   return (
     <>
       <div className="studio-heading">
@@ -30,75 +14,20 @@ export default async function Studio() {
           <h1>
             Yazar stüdyosu<span className="accent-text">.</span>
           </h1>
-          <p>Merhaba {actor.name}. Bugün hangi dünyaya bir kapı açıyoruz?</p>
+          <Suspense fallback={<p>Hikâyelerine kaldığın yerden devam et.</p>}>
+            <StudioGreeting />
+          </Suspense>
         </div>
         <Link href="/studio/yeni" className="button button-dark">
           <Plus size={16} />
           Yeni kitap
         </Link>
       </div>
-      {!actor.emailVerified && (
-        <div className="notice" style={{ marginBottom: 20 }}>
-          Yazmaya başlamak için e-posta adresini doğrulamalısın.
-        </div>
-      )}
-      {myBooks.length ? (
-        <>
-          <div className="stat-grid">
-            <div className="stat-card">
-              <span>Hikâyelerin</span>
-              <strong>{myBooks.length}</strong>
-            </div>
-            <div className="stat-card">
-              <span>Yayımlanan kitap</span>
-              <strong>
-                {myBooks.filter((b) => b.book.status === "PUBLISHED").length}
-              </strong>
-            </div>
-            <div className="stat-card">
-              <span>Yazılan bölüm</span>
-              <strong>{myBooks.reduce((n, b) => n + b.count, 0)}</strong>
-            </div>
-          </div>
-          <div className="stack">
-            {myBooks.map(({ book, count }) => (
-              <Link
-                href={`/studio/books/${book.id}`}
-                className="studio-book"
-                key={book.id}
-              >
-                <BookCover
-                  title={book.title}
-                  author={actor.name}
-                  cover={book.cover}
-                />
-                <div className="studio-book-info">
-                  <span className="label-pill">{labels[book.status]}</span>
-                  <h2>{book.title}</h2>
-                  <p>
-                    {book.genre} · {count} bölüm
-                    {book.premiumStatus === "ACTIVE" ? " · Premium" : ""}
-                  </p>
-                </div>
-                <ChevronRight size={19} />
-              </Link>
-            ))}
-          </div>
-        </>
-      ) : (
-        <div className="empty-state">
-          <Feather size={38} strokeWidth={1.4} />
-          <h2>Büyük dünyalar, küçük bir satırla başlar.</h2>
-          <p>
-            Kitabını oluştur, ciltlerini planla ve ilk bölümünü yaz. Hazır
-            olduğunda yayın başvurunu buradan gönderebilirsin.
-          </p>
-          <Link href="/studio/yeni" className="button button-dark">
-            <Plus size={16} />
-            İlk kitabımı oluştur
-          </Link>
-        </div>
-      )}
+      <Suspense
+        fallback={<BlockSkeleton label="Hikâyelerin yükleniyor" rows={8} />}
+      >
+        <StudioBooks />
+      </Suspense>
     </>
   );
 }

@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/session";
 import { ChevronRight, ShieldCheck } from "./icons";
+import { ProfileMenu } from "./profile-menu";
 
 export async function ShellAccount() {
   const user = await getCurrentUser();
   return user ? (
-    <Link href="/hesap" className="avatar" aria-label="Hesabım">
-      {user.name.charAt(0).toLocaleUpperCase("tr-TR")}
-    </Link>
+    <ProfileMenu
+      user={{ name: user.name, email: user.email, role: user.role }}
+    />
   ) : (
     <Link href="/giris" className="button button-dark button-small">
       Giriş yap <ChevronRight size={14} />

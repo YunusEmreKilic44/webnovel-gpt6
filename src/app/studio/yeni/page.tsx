@@ -1,10 +1,12 @@
+import { PageSkeleton } from "@/components/loading-skeletons";
+import { Suspense } from "react";
 import Link from "next/link";
 import { requireUser } from "@/lib/session";
 import { createBookAction } from "@/modules/publishing/actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { ArrowLeft, ArrowRight } from "@/components/icons";
 import { genres } from "@/lib/utils";
-export default async function NewBook() {
+async function NewBook() {
   await requireUser();
   return (
     <div style={{ maxWidth: 770 }}>
@@ -92,5 +94,13 @@ export default async function NewBook() {
         </ActionForm>
       </div>
     </div>
+  );
+}
+
+export default function Page() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <NewBook />
+    </Suspense>
   );
 }

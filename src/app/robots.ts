@@ -9,6 +9,8 @@ export default function robots(): MetadataRoute.Robots {
         "/admin",
         "/studio",
         "/hesap",
+        "/profil",
+        "/ayarlar",
         "/kutuphanem",
         "/oku/",
         "/giris",

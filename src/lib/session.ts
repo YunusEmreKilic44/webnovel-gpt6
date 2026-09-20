@@ -3,22 +3,14 @@ import { cache } from "react";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getAuth } from "./auth";
-import { getDb } from "@/db";
 
 export const getCurrentUser = cache(async () => {
   const session = await getAuth().api.getSession({ headers: await headers() });
   if (!session) return null;
-  const actor = await getDb().user.findUnique({
-    where: { id: session.user.id },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      emailVerified: true,
-      role: true,
-    },
-  });
-  return actor ?? null;
+  // Better Auth reads the session and its current user from the database.
+  // Cookie caching stays disabled: role changes and revoked sessions apply immediately.
+  const { id, name, email, emailVerified, role } = session.user;
+  return { id, name, email, emailVerified, role };
 });
 export async function requireUser() {
   const actor = await getCurrentUser();

@@ -82,6 +82,7 @@ model Book {
 
   @@unique([slug], map: "books_slug_unique")
   @@index([status, hidden, updatedAt], map: "books_catalog_idx")
+  @@index([authorId, updatedAt], map: "books_author_updated_idx")
   @@map("books")
 }
 
@@ -139,6 +140,7 @@ model Comment {
   user      User     @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "comments_user_id_user_id_fk")
   book      Book     @relation(fields: [bookId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "comments_book_id_books_id_fk")
 
+  @@index([bookId, hidden, createdAt], map: "comments_book_visible_created_idx")
   @@map("comments")
 }
 
@@ -172,6 +174,7 @@ model Rating {
   book      Book     @relation(fields: [bookId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "ratings_book_id_books_id_fk")
 
   @@unique([userId, bookId], map: "rating_user_book_idx")
+  @@index([bookId], map: "ratings_book_idx")
   @@map("ratings")
 }
 

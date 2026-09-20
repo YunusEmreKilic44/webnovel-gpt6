@@ -1,3 +1,4 @@
+import { PageSkeleton } from "@/components/loading-skeletons";
 import { cache, Suspense } from "react";
 import { BlockSkeleton, ButtonSkeleton } from "@/components/loading-skeletons";
 import type { CatalogBook } from "@/modules/catalog/queries";
@@ -36,7 +37,7 @@ export async function generateMetadata({ params }: Props) {
     description: book?.description.slice(0, 160),
   };
 }
-export default async function BookDetail({ params }: Props) {
+async function BookDetail({ params }: Props) {
   const book = await getPublicBook((await params).slug);
   if (!book) notFound();
   return (
@@ -57,6 +58,8 @@ export default async function BookDetail({ params }: Props) {
           author={book.author}
           cover={book.cover}
           className="detail-cover"
+          sizes="(max-width: 700px) 130px, 220px"
+          eager
         />
         <div className="detail-heading">
           <div className="button-row">
@@ -353,5 +356,13 @@ async function Comments({ bookId }: { bookId: string }) {
         </article>
       ))}
     </div>
+  );
+}
+
+export default function Page(props: Props) {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <BookDetail {...props} />
+    </Suspense>
   );
 }

@@ -1,19 +1,11 @@
 "use client";
 import Link from "next/link";
+import Form from "next/form";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useHydrated } from "@/lib/use-hydrated";
-import {
-  BookOpen,
-  Compass,
-  Feather,
-  Library,
-  Menu,
-  Search,
-  TrendingUp,
-  X,
-} from "./icons";
+import { BookOpen, Feather, Library, Menu, Search, X } from "./icons";
 
 export function Shell({
   children,
@@ -64,18 +56,11 @@ export function Shell({
   }, [open]);
   if (pathname.startsWith("/oku/")) return <>{children}</>;
   const links = [
-    { href: "/", label: "Keşfet", icon: Compass, active: pathname === "/" },
     {
       href: "/kesfet",
       label: "Webnoveller",
       icon: BookOpen,
       active: pathname === "/kesfet",
-    },
-    {
-      href: "/kesfet?sort=rating",
-      label: "Sıralamalar",
-      icon: TrendingUp,
-      active: false,
     },
     {
       href: "/kutuphanem",
@@ -107,7 +92,7 @@ export function Shell({
               </Link>
             ))}
           </nav>
-          <form action="/kesfet" className="search-box">
+          <Form action="/kesfet" className="search-box">
             <Search size={17} />
             <input
               name="q"
@@ -115,7 +100,7 @@ export function Shell({
               placeholder="Hikâye veya yazar ara"
               maxLength={100}
             />
-          </form>
+          </Form>
           {account}
           <button
             ref={toggle}

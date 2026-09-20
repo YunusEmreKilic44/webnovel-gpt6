@@ -1,3 +1,5 @@
+import { PageSkeleton } from "@/components/loading-skeletons";
+import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDb } from "@/db";
@@ -10,22 +12,38 @@ import {
   setChapterPriceAction,
 } from "@/modules/publishing/actions";
 import { ArrowLeft, ArrowUpRight } from "@/components/icons";
-export default async function EditChapter({
+async function EditChapter({
   params,
 }: {
   params: Promise<{ bookId: string; chapterId: string }>;
 }) {
-  const actor = await requireUser();
-  const { bookId, chapterId } = await params;
+  const [actor, { bookId, chapterId }] = await Promise.all([
+    requireUser(),
+    params,
+  ]);
   const db = getDb();
-  const book = await db.book.findFirst({
-    where: { id: bookId, authorId: actor.id },
-  });
-  if (!book) notFound();
   const chapter = await db.chapter.findFirst({
-    where: { id: chapterId, bookId },
+    where: { id: chapterId, bookId, book: { authorId: actor.id } },
+    select: {
+      id: true,
+      title: true,
+      content: true,
+      version: true,
+      status: true,
+      firstPublishedAt: true,
+      priceMinor: true,
+      book: {
+        select: {
+          title: true,
+          status: true,
+          premiumStatus: true,
+          firstPremiumApprovedAt: true,
+        },
+      },
+    },
   });
   if (!chapter) notFound();
+  const book = chapter.book;
   const eligible =
     book.premiumStatus === "ACTIVE" &&
     chapter.firstPublishedAt &&
@@ -119,5 +137,15 @@ export default async function EditChapter({
         </section>
       </div>
     </div>
+  );
+}
+
+export default function Page(props: {
+  params: Promise<{ bookId: string; chapterId: string }>;
+}) {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <EditChapter {...props} />
+    </Suspense>
   );
 }

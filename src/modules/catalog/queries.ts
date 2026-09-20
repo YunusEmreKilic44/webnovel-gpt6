@@ -41,8 +41,10 @@ export async function getCatalog(
     genre?: string;
     completed?: boolean;
     sort?: string;
+    limit?: number;
   } = {},
 ) {
+  const limit = Math.max(1, Math.min(60, Math.trunc(filters.limit || 60)));
   const query = filters.q
     ?.trim()
     .slice(0, 100)
@@ -54,7 +56,7 @@ export async function getCatalog(
     ${query ? Prisma.sql`AND (b.title ILIKE ${"%" + query + "%"} OR u.name ILIKE ${"%" + query + "%"})` : Prisma.empty}
     ${filters.completed ? Prisma.sql`AND b.story_status = 'COMPLETED'` : Prisma.empty}
     ORDER BY ${filters.sort === "rating" ? Prisma.sql`"averageRating" DESC,` : filters.sort === "recent" ? Prisma.empty : Prisma.sql`b.featured DESC,`}
-    b.updated_at DESC, b.id LIMIT 60
+    b.updated_at DESC, b.id LIMIT ${limit}
   `);
 }
 export const getPublicBook = cache(async (slug: string) => {
@@ -64,6 +66,13 @@ export const getPublicBook = cache(async (slug: string) => {
   `);
   return rows[0];
 });
+export const getFirstPublicChapter = cache(async (bookId: string) =>
+  getDb().chapter.findFirst({
+    where: { bookId, status: "PUBLISHED", hidden: false },
+    select: { id: true },
+    orderBy: [{ volume: { position: "asc" } }, { position: "asc" }],
+  }),
+);
 export const getPublicChapters = cache(async (bookId: string) => {
   const rows = await getDb().chapter.findMany({
     where: { bookId, status: "PUBLISHED", hidden: false },

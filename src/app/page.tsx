@@ -7,7 +7,7 @@ import {
 } from "@/components/loading-skeletons";
 import Image from "next/image";
 import Link from "next/link";
-import { getCatalog, getPublicChapters } from "@/modules/catalog/queries";
+import { getCatalog, getFirstPublicChapter } from "@/modules/catalog/queries";
 import { BookCard } from "@/components/book-card";
 import { BookCover } from "@/components/book-cover";
 import {
@@ -30,7 +30,7 @@ import {
 import { genres, date } from "@/lib/utils";
 
 const genreIcons = [Sparkles, Sword, Rocket, Heart, ScanEye, Mountain, Drama];
-const getHomeCatalog = cache(() => getCatalog());
+const getHomeCatalog = cache(() => getCatalog({ limit: 6 }));
 
 export default function Home() {
   return (
@@ -142,7 +142,9 @@ async function HomeHero() {
         }
         alt=""
         fill
-        priority
+        loading="eager"
+        fetchPriority="high"
+        quality={60}
         sizes="100vw"
       />
       <div className="hero-shade" />
@@ -204,9 +206,7 @@ async function HomeHero() {
   );
 }
 async function FeaturedReadLink({ bookId }: { bookId?: string }) {
-  const firstChapter = bookId
-    ? (await getPublicChapters(bookId))[0]
-    : undefined;
+  const firstChapter = bookId ? await getFirstPublicChapter(bookId) : undefined;
   return (
     <Link
       href={firstChapter ? `/oku/${firstChapter.id}` : "/studio/yeni"}
@@ -241,7 +241,7 @@ async function HomeShelf() {
   );
 }
 async function RecentBooks() {
-  const recent = await getCatalog({ sort: "recent" });
+  const recent = await getCatalog({ sort: "recent", limit: 6 });
   return (
     <div className="update-list">
       {recent.slice(0, 6).map((book) => (
@@ -250,7 +250,7 @@ async function RecentBooks() {
           className="update-item"
           key={book.id}
         >
-          <BookCover title={book.title} cover={book.cover} />
+          <BookCover title={book.title} cover={book.cover} sizes="48px" />
           <div>
             <h3>{book.title}</h3>
             <p>
@@ -268,7 +268,7 @@ async function RecentBooks() {
   );
 }
 async function RankedBooks() {
-  const ranked = await getCatalog({ sort: "rating" });
+  const ranked = await getCatalog({ sort: "rating", limit: 5 });
   return (
     <div className="ranking-list">
       {ranked.slice(0, 5).map((book, index) => (
@@ -280,7 +280,7 @@ async function RankedBooks() {
           <span className="rank-number">
             {String(index + 1).padStart(2, "0")}
           </span>
-          <BookCover title={book.title} cover={book.cover} />
+          <BookCover title={book.title} cover={book.cover} sizes="48px" />
           <div>
             <h3>{book.title}</h3>
             <p>{book.genre}</p>

@@ -1,115 +1,76 @@
-import type { JSONContent } from "@tiptap/react";
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
-import { getDb } from "@/db";
-import { getCurrentUser } from "@/lib/session";
-import { canReadPublic } from "@/modules/publishing/policies";
-import { getPublicChapters } from "@/modules/catalog/queries";
+import { getReaderChapter } from "@/modules/catalog/reader-queries";
 import { Reader } from "@/components/reader";
+import {
+  BlockSkeleton,
+  ButtonSkeleton,
+  PageSkeleton,
+} from "@/components/loading-skeletons";
+import { ChapterBody, ChapterBookmark, ChapterNavigation } from "./sections";
+
 export const metadata = {
   title: "Okuma zamanı",
   robots: { index: false, follow: false },
 };
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-export default async function ReadChapter({
-  params,
-}: {
-  params: Promise<{ chapterId: string }>;
-}) {
+type Props = { params: Promise<{ chapterId: string }> };
+
+export default function ReadChapter(props: Props) {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <ReadingPage {...props} />
+    </Suspense>
+  );
+}
+
+async function ReadingPage({ params }: Props) {
   const { chapterId } = await params;
-  const db = getDb();
-  // First query contains no body. Authorization must precede fetching content.
-  const chapter = await db.chapter.findUnique({
-    where: { id: chapterId },
-    select: {
-      id: true,
-      publishedTitle: true,
-      bookId: true,
-      status: true,
-      hidden: true,
-      accessType: true,
-      priceMinor: true,
-      publishedWordCount: true,
-      book: {
-        select: {
-          id: true,
-          title: true,
-          slug: true,
-          status: true,
-          hidden: true,
-          author: { select: { name: true } },
-        },
-      },
-    },
-  });
-  const entry = chapter
-    ? {
-        chapter: {
-          ...chapter,
-          title: chapter.publishedTitle,
-          price: chapter.priceMinor,
-          wordCount: chapter.publishedWordCount,
-        },
-        book: chapter.book,
-        author: chapter.book.author.name,
-      }
-    : null;
-  if (
-    !entry ||
-    entry.book.hidden ||
-    entry.book.status !== "PUBLISHED" ||
-    entry.chapter.hidden ||
-    entry.chapter.status !== "PUBLISHED"
-  )
-    notFound();
-  // Start the authorized public body query alongside navigation and session data.
-  const bodyPromise = canReadPublic(entry.book, entry.chapter)
-    ? db.chapter.findFirst({
-        where: {
-          id: chapterId,
-          accessType: "FREE",
-          status: "PUBLISHED",
-          hidden: false,
-          book: { status: "PUBLISHED", hidden: false },
-        },
-        select: { publishedContent: true },
-      })
-    : Promise.resolve(null);
-  const [allChapters, actor, cookieStore, body] = await Promise.all([
-    getPublicChapters(entry.book.id),
-    getCurrentUser(),
+  const [chapter, store] = await Promise.all([
+    getReaderChapter(chapterId),
     cookies(),
-    bodyPromise,
   ]);
-  const index = allChapters.findIndex((c) => c.id === chapterId);
-  const metadata = allChapters[index];
-  if (!metadata) notFound();
-  const content = (body?.publishedContent as JSONContent | null) ?? null;
-  const storedTheme = cookieStore.get("reader-theme")?.value;
+  if (!chapter) notFound();
+  const storedTheme = store.get("reader-theme")?.value;
   const theme =
     storedTheme === "paper" || storedTheme === "sepia" ? storedTheme : "dark";
-  const font = Number(cookieStore.get("reader-font")?.value || 20);
+  const font = Number(store.get("reader-font")?.value || 20);
   return (
     <Reader
-      bookId={entry.book.id}
-      bookTitle={entry.book.title}
-      bookSlug={entry.book.slug}
-      title={entry.chapter.title!}
+      {...chapter}
       chapterId={chapterId}
-      author={entry.author}
-      content={content}
-      position={metadata.position}
-      volumeTitle={metadata.volumeTitle}
-      wordCount={entry.chapter.wordCount}
-      price={entry.chapter.price}
-      previous={allChapters[index - 1]?.id}
-      next={allChapters[index + 1]?.id}
-      loggedIn={!!actor}
       initialTheme={theme}
       initialFontSize={
         Number.isFinite(font) ? Math.max(16, Math.min(28, font)) : 20
       }
-    />
+      navigation={
+        <Suspense
+          fallback={<ButtonSkeleton label="Bölüm bağlantıları yükleniyor" />}
+        >
+          <ChapterNavigation {...chapter} chapterId={chapterId} />
+        </Suspense>
+      }
+      bookmark={
+        chapter.accessType === "FREE" ? (
+          <Suspense
+            fallback={<ButtonSkeleton label="Okuma işareti yükleniyor" />}
+          >
+            <ChapterBookmark bookId={chapter.bookId} chapterId={chapterId} />
+          </Suspense>
+        ) : null
+      }
+    >
+      <Suspense
+        fallback={<BlockSkeleton label="Bölüm metni yükleniyor" rows={12} />}
+      >
+        <ChapterBody
+          chapterId={chapterId}
+          bookSlug={chapter.bookSlug}
+          price={chapter.price}
+        />
+      </Suspense>
+    </Reader>
   );
 }

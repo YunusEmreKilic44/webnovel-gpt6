@@ -2,7 +2,7 @@
 
 Anime/manga görsel kimliğine sahip, Türkçe ve metin tabanlı webnovel platformu. Next.js App Router, React, TypeScript, Prisma 7 ve PostgreSQL kullanır. Ürün kararları, çalışan kapsam ve hedef mimari: [WEBNOVEL_MIMARI.md](./WEBNOVEL_MIMARI.md).
 
-Son güncelleme: **19 Eylül 2026**. Uygulama Neon PostgreSQL kullanır. Yerel kitaplar, kullanıcılar ve ilişkili kayıtlar yedeklenerek Neon’a taşındı.
+Son güncelleme: **20 Eylül 2026**. Uygulama Neon PostgreSQL kullanır. Yerel kitaplar, kullanıcılar ve ilişkili kayıtlar yedeklenerek Neon’a taşındı.
 
 ## Hızlı başlangıç
 
@@ -60,6 +60,8 @@ Koyu zeminli anime/webnovel tasarımı; yatay gezinme, mobil menü, seri vitrini
 
 Menü ve sayfa iskeleti oturum sorgusunu beklemeden gönderilir. Ana sayfadaki vitrinler, keşfet sonuçları, kitap bölümleri/yorumları ve kütüphane alanları ayrı Suspense sınırlarıyla yüklenir. Ortak kitap ve bölüm sorguları yalnız aynı istek içinde paylaşılır; kullanıcı verileri istekler arasında önbelleğe alınmaz. Okuyucu, kitap ve yönetim sayfaları için yükleme iskeletleri bulunur.
 
+Ayarlar, profil, stüdyo kitapları, cilt/bölüm yönetimi ve başvurular da bağımsız sunucu bileşenlerinden yüklenir. Okuyucunun metni ve bölüm bağlantıları oturum sorgusunu beklemez; metin sunucuda render edilir ve ücretli/taslak içerik sorgu koşullarıyla korunur. Bölüm gezinmesi tüm bölüm listesini taşımak yerine yalnız önceki/sonraki kimlikleri getirir. Ana sayfa sorguları gerekli 6/6/5 kitapla sınırlıdır; Better Auth’ın getirdiği kullanıcı için ikinci sorgu yapılmaz. Kitap-yazar, yorum ve puan sorgularına indeksler eklendi. Arama formları `next/form` ile tam sayfa yenilemeden geçiş yapar.
+
 Yerel illüstrasyonlar: `public/art/`. Vitrin için bir geniş görsel ve yazarın seçebileceği altı kapak bulunur; Next.js Image görselleri cihaz boyutuna göre sunar. Görsel üretim bilgileri ve promptlar: [ARTWORK.md](./public/art/ARTWORK.md).
 
 Bu sürüm metin tabanlı webnovel okuyucusudur; manga sayfası yükleme veya panel okuyucusu içermez. Görsel kimlik `src/app/globals.css`, gezinme `src/components/shell.tsx`, kapak sunumu `src/components/book-cover.tsx` üzerinden yönetilir.
@@ -70,6 +72,7 @@ Bu sürüm metin tabanlı webnovel okuyucusudur; manga sayfası yükleme veya pa
 - Kitap sayfası, cilt/bölüm listeleri ve kalıcı bölüm URL'leri.
 - Açık/koyu/sepya okuma, yazı boyutu tercihleri ve bölüm bazlı okuma işareti.
 - Better Auth ile kayıt, giriş, çıkış; e-posta doğrulama ve şifre yenileme sağlayıcı bağlantısı.
+- Navbar profil menüsü: profil, ayarlar, kütüphane, stüdyo ve çıkış; yöneticide yönetim bağlantısı. `/profil` hesap özeti ve hikâyeleri, `/ayarlar` ad güncelleme, şifre değişikliği ve tarayıcıya özel okuma tercihleri sunar. Eski `/hesap` adresi `/profil` sayfasına yönlenir.
 - Kullanıcıya özel kütüphane, 1–5 puan, kitap yorumları ve spoiler gizleme.
 - Kitap, cilt ve bölüm oluşturma; Tiptap editörü ve gecikmeli otomatik taslak kaydı.
 - Sürüm çakışması kontrolü: eski sekme yeni metni sessizce ezemez.

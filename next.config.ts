@@ -3,6 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   devIndicators: false,
   serverExternalPackages: ["pg"],
+  images: { qualities: [60, 75] },
   experimental: { serverActions: { bodySizeLimit: "1mb" } },
   async headers() {
     return [

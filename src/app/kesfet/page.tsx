@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { BookGridSkeleton } from "@/components/loading-skeletons";
 import Link from "next/link";
+import Form from "next/form";
 import { BookCard } from "@/components/book-card";
 import { BookOpen, Search } from "@/components/icons";
 import { getCatalog } from "@/modules/catalog/queries";
@@ -29,7 +30,7 @@ export default async function Discover({
           <p>Merak ettiğin dünyayı bul. Gerisini ilk sayfaya bırak.</p>
         </div>
       </div>
-      <form className="catalog-toolbar" action="/kesfet">
+      <Form className="catalog-toolbar" action="/kesfet">
         <input
           className="input"
           name="q"
@@ -70,7 +71,7 @@ export default async function Discover({
           <Search size={15} />
           Ara
         </button>
-      </form>
+      </Form>
       <Suspense
         key={JSON.stringify([q, genre, sort, completed])}
         fallback={<BookGridSkeleton />}

@@ -9,12 +9,16 @@ export function BookCover({
   cover,
   subtitle,
   className,
+  sizes = "(max-width: 600px) 44vw, (max-width: 1000px) 28vw, 205px",
+  eager = false,
 }: {
   title: string;
   author?: string;
   cover: Book["cover"];
   subtitle?: string;
   className?: string;
+  sizes?: string;
+  eager?: boolean;
 }) {
   const artwork = covers.includes(cover) ? cover : "ember";
   return (
@@ -23,7 +27,10 @@ export function BookCover({
         src={`/art/${artwork}.png`}
         alt={`${title} anime kapak illüstrasyonu`}
         fill
-        sizes="(max-width: 600px) 45vw, (max-width: 1000px) 30vw, 205px"
+        sizes={sizes}
+        quality={60}
+        loading={eager ? "eager" : "lazy"}
+        fetchPriority={eager ? "high" : undefined}
       />
       <div className="cover-caption">
         <span className="cover-series">SATIR ORIGINAL</span>
