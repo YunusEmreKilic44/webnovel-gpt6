@@ -52,6 +52,14 @@ export function HeroSkeleton() {
             <div className="skeleton skeleton-button" />
           </div>
         </div>
+        {/* Mirrors the edition badge of the loaded hero so the copy column
+            keeps its width and nothing shifts when the data arrives. */}
+        <div className="hero-edition" aria-hidden="true">
+          <span>SPOTLIGHT</span>
+          <strong>
+            <span className="skeleton skeleton-edition" />
+          </strong>
+        </div>
       </div>
     </section>
   );

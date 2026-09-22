@@ -3,7 +3,11 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   devIndicators: false,
   serverExternalPackages: ["pg"],
-  images: { qualities: [60, 75] },
+  images: {
+    qualities: [60, 75],
+    formats: ["image/avif", "image/webp"],
+    minimumCacheTTL: 2678400,
+  },
   experimental: { serverActions: { bodySizeLimit: "1mb" } },
   async headers() {
     return [

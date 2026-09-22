@@ -1,8 +1,31 @@
 import "server-only";
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { getDb } from "@/db";
 import { Prisma } from "@/generated/prisma/client";
 import type { Book } from "@/db/schema";
+
+// Every published-catalog read shares this tag, so a single revalidateTag call
+// after a publish, a rating or a comment refreshes all of them at once.
+export const CATALOG_TAG = "catalog";
+const CATALOG_REVALIDATE = 60;
+
+// unstable_cache reads Next.js' incremental cache, which only exists inside the
+// server runtime. Vitest suites and scripts import these queries directly, so
+// outside the runtime they run the plain query instead of throwing.
+const insideNextServer = Boolean(process.env.NEXT_RUNTIME);
+
+function catalogCache<Args extends unknown[], Result>(
+  key: string,
+  query: (...args: Args) => Promise<Result>,
+) {
+  const cached = unstable_cache(query, [key], {
+    tags: [CATALOG_TAG],
+    revalidate: CATALOG_REVALIDATE,
+  });
+  return (...args: Args) =>
+    insideNextServer ? cached(...args) : query(...args);
+}
 
 export type CatalogBook = Pick<
   Book,
@@ -26,31 +49,61 @@ export type CatalogBook = Pick<
   averageRating: number;
   ratingCount: number;
 };
+
+// unstable_cache round-trips its result through JSON, which would hand back a
+// string on a cache hit and a Date on a miss. Timestamps are stored as numbers
+// so both paths return the same shape.
+type StoredBook = Omit<CatalogBook, "updatedAt"> & { updatedAt: number };
+const storeBook = ({ updatedAt, ...book }: CatalogBook): StoredBook => ({
+  ...book,
+  updatedAt: updatedAt.getTime(),
+});
+const readBook = ({ updatedAt, ...book }: StoredBook): CatalogBook => ({
+  ...book,
+  updatedAt: new Date(updatedAt),
+});
+
 const catalogColumns = Prisma.sql`
   b.id, b.slug, b.title, b.subtitle, b.description, b.genre, b.cover, b.status,
   b.story_status AS "storyStatus", b.premium_status AS "premiumStatus",
   b.author_id AS "authorId", b.featured, b.updated_at AS "updatedAt", u.name AS author,
-  (SELECT count(*)::int FROM chapters c WHERE c.book_id = b.id AND c.status = 'PUBLISHED' AND NOT c.hidden) AS "chapterCount",
-  (SELECT count(DISTINCT c.volume_id)::int FROM chapters c WHERE c.book_id = b.id AND c.status = 'PUBLISHED' AND NOT c.hidden) AS "volumeCount",
-  coalesce((SELECT round(avg(r.score), 1)::float FROM ratings r WHERE r.book_id = b.id), 0) AS "averageRating",
-  (SELECT count(*)::int FROM ratings r WHERE r.book_id = b.id) AS "ratingCount"
+  ch.chapter_count AS "chapterCount", ch.volume_count AS "volumeCount",
+  rt.average_rating AS "averageRating", rt.rating_count AS "ratingCount"
 `;
-export async function getCatalog(
-  filters: {
-    q?: string;
-    genre?: string;
-    completed?: boolean;
-    sort?: string;
-    limit?: number;
-  } = {},
-) {
+// One lateral pass over chapters and one over ratings, instead of a separate
+// correlated subquery per counted column.
+const catalogAggregates = Prisma.sql`
+  LEFT JOIN LATERAL (
+    SELECT count(*)::int AS chapter_count,
+           count(DISTINCT c.volume_id)::int AS volume_count
+    FROM chapters c
+    WHERE c.book_id = b.id AND c.status = 'PUBLISHED' AND NOT c.hidden
+  ) ch ON true
+  LEFT JOIN LATERAL (
+    SELECT coalesce(round(avg(r.score), 1)::float, 0) AS average_rating,
+           count(*)::int AS rating_count
+    FROM ratings r
+    WHERE r.book_id = b.id
+  ) rt ON true
+`;
+
+type CatalogFilters = {
+  q?: string;
+  genre?: string;
+  completed?: boolean;
+  sort?: string;
+  limit?: number;
+};
+
+async function queryCatalog(filters: CatalogFilters): Promise<StoredBook[]> {
   const limit = Math.max(1, Math.min(60, Math.trunc(filters.limit || 60)));
   const query = filters.q
     ?.trim()
     .slice(0, 100)
     .replace(/[\\%_]/g, "\\$&");
-  return getDb().$queryRaw<CatalogBook[]>(Prisma.sql`
-    SELECT ${catalogColumns} FROM books b JOIN "user" u ON u.id = b.author_id
+  const rows = await getDb().$queryRaw<CatalogBook[]>(Prisma.sql`
+    SELECT ${catalogColumns}
+    FROM books b JOIN "user" u ON u.id = b.author_id ${catalogAggregates}
     WHERE b.status = 'PUBLISHED' AND NOT b.hidden
     ${filters.genre && filters.genre !== "Tümü" ? Prisma.sql`AND b.genre = ${filters.genre}` : Prisma.empty}
     ${query ? Prisma.sql`AND (b.title ILIKE ${"%" + query + "%"} OR u.name ILIKE ${"%" + query + "%"})` : Prisma.empty}
@@ -58,22 +111,54 @@ export async function getCatalog(
     ORDER BY ${filters.sort === "rating" ? Prisma.sql`"averageRating" DESC,` : filters.sort === "recent" ? Prisma.empty : Prisma.sql`b.featured DESC,`}
     b.updated_at DESC, b.id LIMIT ${limit}
   `);
+  return rows.map(storeBook);
 }
-export const getPublicBook = cache(async (slug: string) => {
+const cachedCatalog = catalogCache("catalog-list", queryCatalog);
+
+export async function getCatalog(filters: CatalogFilters = {}) {
+  // Free-text search stays uncached: arbitrary terms would grow the key space
+  // without bound, and each term is typically requested once.
+  const rows = filters.q?.trim()
+    ? await queryCatalog(filters)
+    : await cachedCatalog(filters);
+  return rows.map(readBook);
+}
+
+async function queryPublicBook(slug: string) {
   const rows = await getDb().$queryRaw<CatalogBook[]>(Prisma.sql`
-    SELECT ${catalogColumns} FROM books b JOIN "user" u ON u.id = b.author_id
+    SELECT ${catalogColumns}
+    FROM books b JOIN "user" u ON u.id = b.author_id ${catalogAggregates}
     WHERE b.slug = ${slug} AND b.status = 'PUBLISHED' AND NOT b.hidden
   `);
-  return rows[0];
+  return rows[0] ? storeBook(rows[0]) : null;
+}
+const cachedPublicBook = catalogCache("public-book", queryPublicBook);
+
+export const getPublicBook = cache(async (slug: string) => {
+  const row = await cachedPublicBook(slug);
+  return row ? readBook(row) : undefined;
 });
-export const getFirstPublicChapter = cache(async (bookId: string) =>
-  getDb().chapter.findFirst({
-    where: { bookId, status: "PUBLISHED", hidden: false },
-    select: { id: true },
-    orderBy: [{ volume: { position: "asc" } }, { position: "asc" }],
-  }),
+
+// The home hero needs the first readable chapter of the book it is already
+// showing. Resolving it in one statement keeps the page from waiting on a
+// second round trip after the catalog query returns.
+async function queryFeaturedChapterId() {
+  const rows = await getDb().$queryRaw<{ id: string }[]>(Prisma.sql`
+    SELECT c.id FROM chapters c JOIN volumes v ON v.id = c.volume_id
+    WHERE c.book_id = (
+      SELECT b.id FROM books b
+      WHERE b.status = 'PUBLISHED' AND NOT b.hidden
+      ORDER BY b.featured DESC, b.updated_at DESC, b.id LIMIT 1
+    ) AND c.status = 'PUBLISHED' AND NOT c.hidden
+    ORDER BY v.position ASC, c.position ASC LIMIT 1
+  `);
+  return rows[0]?.id ?? null;
+}
+export const getFeaturedChapterId = cache(
+  catalogCache("featured-chapter", queryFeaturedChapterId),
 );
-export const getPublicChapters = cache(async (bookId: string) => {
+
+async function queryPublicChapters(bookId: string) {
   const rows = await getDb().chapter.findMany({
     where: { bookId, status: "PUBLISHED", hidden: false },
     select: {
@@ -99,9 +184,19 @@ export const getPublicChapters = cache(async (bookId: string) => {
     accessType: c.accessType,
     priceMinor: c.priceMinor,
     wordCount: c.publishedWordCount,
-    publishedAt: c.firstPublishedAt,
+    publishedAt: c.firstPublishedAt?.getTime() ?? null,
+  }));
+}
+const cachedPublicChapters = catalogCache("public-chapters", queryPublicChapters);
+
+export const getPublicChapters = cache(async (bookId: string) => {
+  const rows = await cachedPublicChapters(bookId);
+  return rows.map(({ publishedAt, ...chapter }) => ({
+    ...chapter,
+    publishedAt: publishedAt === null ? null : new Date(publishedAt),
   }));
 });
+
 export async function getBookComments(bookId: string) {
   const rows = await getDb().comment.findMany({
     where: { bookId, hidden: false },
@@ -132,8 +227,9 @@ export async function getMyBookState(userId: string, bookId: string) {
 }
 export async function getLibrary(userId: string) {
   return getDb().$queryRaw<CatalogBook[]>(Prisma.sql`
-    SELECT ${catalogColumns} FROM library_entries l JOIN books b ON b.id = l.book_id
-    JOIN "user" u ON u.id = b.author_id
+    SELECT ${catalogColumns}
+    FROM library_entries l JOIN books b ON b.id = l.book_id
+    JOIN "user" u ON u.id = b.author_id ${catalogAggregates}
     WHERE l.user_id = ${userId} AND b.status = 'PUBLISHED' AND NOT b.hidden
     ORDER BY l.created_at DESC
   `);

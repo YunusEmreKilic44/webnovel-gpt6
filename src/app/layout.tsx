@@ -11,7 +11,6 @@ export const metadata: Metadata = {
     "Yeni hikâyeler keşfet, sevdiğin yazarları takip et ve kendi dünyanı yaz. Her hikâye bir satırla başlar.",
   metadataBase: new URL(process.env.BETTER_AUTH_URL || "http://localhost:3000"),
 };
-export const dynamic = "force-dynamic";
 export default function RootLayout({
   children,
 }: {

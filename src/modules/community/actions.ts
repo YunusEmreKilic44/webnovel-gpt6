@@ -1,7 +1,8 @@
 "use server";
 import { z } from "zod";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { getDb } from "@/db";
+import { CATALOG_TAG } from "@/modules/catalog/queries";
 import { getCurrentUser } from "@/lib/session";
 import {
   canReadPublic,
@@ -94,6 +95,7 @@ export async function interactAction(
         update: { chapterId, updatedAt: new Date() },
       });
     }
+    updateTag(CATALOG_TAG);
     revalidatePath("/", "layout");
     const messages = {
       save: "Kütüphanene eklendi.",

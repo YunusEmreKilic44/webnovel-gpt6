@@ -1,9 +1,10 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { cookies } from "next/headers";
 import { z } from "zod";
 import { getDb } from "@/db";
+import { CATALOG_TAG } from "@/modules/catalog/queries";
 import { getCurrentUser } from "@/lib/session";
 import type { ActionState } from "@/lib/action-state";
 
@@ -26,6 +27,8 @@ export async function updateProfile(
       where: { id: user.id },
       data: { name: result.data, updatedAt: new Date() },
     });
+    // The display name is denormalised into every catalog row as the author.
+    updateTag(CATALOG_TAG);
     revalidatePath("/", "layout");
     return { ok: true, message: "Profilin güncellendi." };
   } catch {

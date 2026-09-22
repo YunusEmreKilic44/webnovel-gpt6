@@ -2,8 +2,9 @@
 import Link from "next/link";
 import Form from "next/form";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { NavProgress } from "./nav-progress";
 import { useHydrated } from "@/lib/use-hydrated";
 import { BookOpen, Feather, Library, Menu, Search, X } from "./icons";
 
@@ -54,7 +55,19 @@ export function Shell({
       document.removeEventListener("keydown", onKey);
     };
   }, [open]);
-  if (pathname.startsWith("/oku/")) return <>{children}</>;
+  // NavProgress reads the query string, so it needs a boundary of its own.
+  const progress = (
+    <Suspense fallback={null}>
+      <NavProgress />
+    </Suspense>
+  );
+  if (pathname.startsWith("/oku/"))
+    return (
+      <>
+        {progress}
+        {children}
+      </>
+    );
   const links = [
     {
       href: "/kesfet",
@@ -71,6 +84,7 @@ export function Shell({
   ];
   return (
     <div className="app-shell">
+      {progress}
       <header className="site-header">
         <div className="header-inner">
           <Link href="/" className="brand" aria-label="Satır ana sayfa">

@@ -2,12 +2,11 @@ import { cache, Suspense } from "react";
 import {
   BlockSkeleton,
   BookGridSkeleton,
-  ButtonSkeleton,
   HeroSkeleton,
 } from "@/components/loading-skeletons";
 import Image from "next/image";
 import Link from "next/link";
-import { getCatalog, getFirstPublicChapter } from "@/modules/catalog/queries";
+import { getCatalog, getFeaturedChapterId } from "@/modules/catalog/queries";
 import { BookCard } from "@/components/book-card";
 import { BookCover } from "@/components/book-cover";
 import {
@@ -31,6 +30,8 @@ import { genres, date } from "@/lib/utils";
 
 const genreIcons = [Sparkles, Sword, Rocket, Heart, ScanEye, Mountain, Drama];
 const getHomeCatalog = cache(() => getCatalog({ limit: 6 }));
+
+export const revalidate = 60;
 
 export default function Home() {
   return (
@@ -129,7 +130,12 @@ export default function Home() {
 }
 
 async function HomeHero() {
-  const catalog = await getHomeCatalog();
+  // Both reads are independent, so the hero never waits on a second round trip
+  // to learn which chapter its primary button should open.
+  const [catalog, firstChapterId] = await Promise.all([
+    getHomeCatalog(),
+    getFeaturedChapterId(),
+  ]);
   const featured = catalog[0];
   return (
     <section className="home-hero" aria-label="Öne çıkan hikâye">
@@ -180,11 +186,14 @@ async function HomeHero() {
             </div>
           )}
           <div className="hero-actions">
-            <Suspense
-              fallback={<ButtonSkeleton label="Okuma bağlantısı yükleniyor" />}
+            <Link
+              href={firstChapterId ? `/oku/${firstChapterId}` : "/studio/yeni"}
+              className="button button-dark"
             >
-              <FeaturedReadLink bookId={featured?.id} />
-            </Suspense>
+              <BookOpen size={17} />
+              {firstChapterId ? "Okumaya başla" : "Hikâyeni yaz"}
+              <ArrowRight size={17} />
+            </Link>
             {featured && (
               <Link
                 href={`/kitap/${featured.slug}`}
@@ -203,19 +212,6 @@ async function HomeHero() {
         </div>
       </div>
     </section>
-  );
-}
-async function FeaturedReadLink({ bookId }: { bookId?: string }) {
-  const firstChapter = bookId ? await getFirstPublicChapter(bookId) : undefined;
-  return (
-    <Link
-      href={firstChapter ? `/oku/${firstChapter.id}` : "/studio/yeni"}
-      className="button button-dark"
-    >
-      <BookOpen size={17} />
-      {firstChapter ? "Okumaya başla" : "Hikâyeni yaz"}
-      <ArrowRight size={17} />
-    </Link>
   );
 }
 async function HomeShelf() {

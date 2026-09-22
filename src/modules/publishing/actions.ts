@@ -1,7 +1,8 @@
 "use server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { z } from "zod";
 import { getDb } from "@/db";
+import { CATALOG_TAG } from "@/modules/catalog/queries";
 import { getCurrentUser } from "@/lib/session";
 import type { ActionState } from "@/lib/action-state";
 import { DomainError } from "./policies";
@@ -21,6 +22,7 @@ async function run(
     };
   try {
     const result = await work(actor);
+    updateTag(CATALOG_TAG);
     revalidatePath("/", "layout");
     return {
       ok: true,
