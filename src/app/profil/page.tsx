@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/session";
 import { getDb } from "@/db";
 import { AccountNavigation } from "@/components/account-navigation";
 import { BlockSkeleton } from "@/components/loading-skeletons";
+import { Avatar } from "@/components/avatar";
 import {
   ArrowRight,
   BookOpen,
@@ -46,9 +47,12 @@ async function Profile() {
   return (
     <>
       <section className="profile-overview">
-        <div className="profile-avatar" aria-hidden="true">
-          {user.name.charAt(0).toLocaleUpperCase("tr-TR")}
-        </div>
+        <Avatar
+          name={user.name}
+          url={user.avatarUrl}
+          className="profile-avatar"
+          size={90}
+        />
         <div className="profile-identity">
           <span className="section-eyebrow">
             {user.role === "admin" ? "YÖNETİCİ" : "SATIR OKURU"}

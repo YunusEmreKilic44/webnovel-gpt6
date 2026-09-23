@@ -115,9 +115,6 @@ export function Reader(props: ReaderProps) {
             <h1>{props.title}</h1>
             <div className="reader-meta">
               <span>{props.author}</span>
-              <span>
-                {Math.max(1, Math.ceil(props.wordCount / 200))} dakika okuma
-              </span>
             </div>
           </header>
           {props.children}

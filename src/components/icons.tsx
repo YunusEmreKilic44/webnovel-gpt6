@@ -28,6 +28,7 @@ export {
   MessageCircle,
   Moon,
   MoreHorizontal,
+  PenLine,
   Plus,
   Search,
   Settings2,

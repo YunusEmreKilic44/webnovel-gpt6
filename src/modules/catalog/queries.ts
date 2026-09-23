@@ -36,6 +36,7 @@ export type CatalogBook = Pick<
   | "description"
   | "genre"
   | "cover"
+  | "coverUrl"
   | "status"
   | "storyStatus"
   | "premiumStatus"
@@ -64,7 +65,8 @@ const readBook = ({ updatedAt, ...book }: StoredBook): CatalogBook => ({
 });
 
 const catalogColumns = Prisma.sql`
-  b.id, b.slug, b.title, b.subtitle, b.description, b.genre, b.cover, b.status,
+  b.id, b.slug, b.title, b.subtitle, b.description, b.genre, b.cover,
+  b.cover_url AS "coverUrl", b.status,
   b.story_status AS "storyStatus", b.premium_status AS "premiumStatus",
   b.author_id AS "authorId", b.featured, b.updated_at AS "updatedAt", u.name AS author,
   ch.chapter_count AS "chapterCount", ch.volume_count AS "volumeCount",
@@ -158,9 +160,19 @@ export const getFeaturedChapterId = cache(
   catalogCache("featured-chapter", queryFeaturedChapterId),
 );
 
-async function queryPublicChapters(bookId: string) {
+export const CHAPTER_PREVIEW_SIZE = 10;
+export const CHAPTER_PAGE_SIZE = 50;
+
+async function queryPublicChapters(bookId: string, take?: number, skip = 0) {
   const rows = await getDb().chapter.findMany({
-    where: { bookId, status: "PUBLISHED", hidden: false },
+    where: {
+      bookId,
+      status: "PUBLISHED",
+      hidden: false,
+      book: { status: "PUBLISHED", hidden: false },
+    },
+    take,
+    skip,
     select: {
       id: true,
       publishedTitle: true,
@@ -172,7 +184,11 @@ async function queryPublicChapters(bookId: string) {
       firstPublishedAt: true,
       volume: { select: { title: true, position: true } },
     },
-    orderBy: [{ volume: { position: "asc" } }, { position: "asc" }],
+    orderBy: [
+      { volume: { position: "asc" } },
+      { position: "asc" },
+      { id: "asc" },
+    ],
   });
   return rows.map((c) => ({
     id: c.id,
@@ -187,17 +203,22 @@ async function queryPublicChapters(bookId: string) {
     publishedAt: c.firstPublishedAt?.getTime() ?? null,
   }));
 }
-const cachedPublicChapters = catalogCache("public-chapters", queryPublicChapters);
+const cachedPublicChapters = catalogCache(
+  "public-chapters",
+  queryPublicChapters,
+);
 
-export const getPublicChapters = cache(async (bookId: string) => {
-  const rows = await cachedPublicChapters(bookId);
-  return rows.map(({ publishedAt, ...chapter }) => ({
-    ...chapter,
-    publishedAt: publishedAt === null ? null : new Date(publishedAt),
-  }));
-});
+export const getPublicChapters = cache(
+  async (bookId: string, take?: number, skip = 0) => {
+    const rows = await cachedPublicChapters(bookId, take, skip);
+    return rows.map(({ publishedAt, ...chapter }) => ({
+      ...chapter,
+      publishedAt: publishedAt === null ? null : new Date(publishedAt),
+    }));
+  },
+);
 
-export async function getBookComments(bookId: string) {
+export const getBookComments = cache(async (bookId: string) => {
   const rows = await getDb().comment.findMany({
     where: { bookId, hidden: false },
     select: {
@@ -205,13 +226,18 @@ export async function getBookComments(bookId: string) {
       body: true,
       spoiler: true,
       createdAt: true,
-      user: { select: { name: true } },
+      user: { select: { name: true, avatarUrl: true } },
+      _count: { select: { likes: true } },
     },
     orderBy: { createdAt: "desc" },
     take: 30,
   });
-  return rows.map(({ user, ...comment }) => ({ ...comment, name: user.name }));
-}
+  return rows.map(({ user, ...comment }) => ({
+    ...comment,
+    name: user.name,
+    avatarUrl: user.avatarUrl,
+  }));
+});
 export async function getMyBookState(userId: string, bookId: string) {
   const [saved, rating] = await Promise.all([
     getDb().libraryEntry.findUnique({

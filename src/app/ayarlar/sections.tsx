@@ -3,9 +3,11 @@ import { requireUser } from "@/lib/session";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { PasswordForm } from "@/components/password-form";
 import {
+  updateAvatarAction,
   updateProfile,
   updateReadingPreferences,
 } from "@/modules/account/actions";
+import { AvatarField } from "@/components/avatar-field";
 import { BookOpen, LockKeyhole, UserRound } from "@/components/icons";
 
 export async function ProfileSettings() {
@@ -18,8 +20,25 @@ export async function ProfileSettings() {
       <div className="settings-section-heading">
         <UserRound size={21} />
         <h2 id="profile-settings-title">Profil bilgileri</h2>
-        <p>Hikâyelerinde ve yorumlarında görünen adın.</p>
+        <p>Hikâyelerinde ve yorumlarında görünen adın ve profil resmin.</p>
       </div>
+      <div className="stack">
+        <ActionForm action={updateAvatarAction} className="form-stack">
+          <AvatarField name={user.name} currentUrl={user.avatarUrl} />
+        </ActionForm>
+        <ProfileNameForm user={user} />
+      </div>
+    </section>
+  );
+}
+
+function ProfileNameForm({
+  user,
+}: {
+  user: Awaited<ReturnType<typeof requireUser>>;
+}) {
+  return (
+    <>
       <ActionForm action={updateProfile} className="form-stack">
         <label className="field">
           Görünen adın
@@ -45,7 +64,7 @@ export async function ProfileSettings() {
           <SubmitButton>Profili kaydet</SubmitButton>
         </div>
       </ActionForm>
-    </section>
+    </>
   );
 }
 

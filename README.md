@@ -39,6 +39,23 @@ Eski `.data/postgres` verileri ve `.data/neon-import-backup-*` yedekleri korunur
 
 Geliştirmede (`npm run dev`), localhost adresinde `DEV_SKIP_EMAIL_VERIFICATION=true` kullanılabilir. Üretimde e-posta doğrulaması zorunludur; `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `RESEND_API_KEY` ve `EMAIL_FROM` tanımlanmalıdır. Şifre yenileme de e-posta servisini kullanır.
 
+### Cloudinary (görsel yükleme)
+
+Kitap kapakları ve ana sayfa slayt görselleri Cloudinary’de saklanır; veritabanında yalnız teslim adresi (`cover_url`, `image_url`) ve silme için `public_id` tutulur. `.env` içinde şunları tanımlayın (Cloudinary Dashboard → Settings → API Keys):
+
+```bash
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=   # yalnız sunucuda; NEXT_PUBLIC_ öneki vermeyin
+CLOUDINARY_FOLDER=satir  # yüklemeler satir/covers ve satir/slides altına gider
+```
+
+- Yüklenen dosya önce sunucuda `sharp` ile doğrulanır (JPG/PNG/WebP, en fazla 3 MB), EXIF temizlenerek WebP’ye çevrilir, sonra imzalı API ile yüklenir. Değiştirilen veya kaldırılan eski görsel Cloudinary’den silinir; kayıt başarısız olursa yeni yüklenen dosya da geri silinir.
+- Sayfalar görselleri `next/image` + Cloudinary loader ile boyutlandırır (`f_auto,q_auto,w_…`).
+- Ayarlar eksikse görsel yükleme hata mesajı verir; hazır illüstrasyonlar çalışmaya devam eder.
+- Migration’dan sonra eski, veritabanında saklanan slayt görsellerini taşımak için: `npm run media:migrate-slides -- --dry-run`, ardından `npm run media:migrate-slides`.
+- Yöneticiler kitap ayrıntı sayfasında yazarın yüklediği kapağı gerekçeyle kaldırabilir.
+
 ## Prisma geliştirme akışı
 
 `npm ci` ve `npm run build`, Prisma Client'ı otomatik üretir. Şema `prisma/schema.prisma` içinde, PostgreSQL bağlantısı `prisma.config.ts` ve `src/db/index.ts` içindedir. Üretilen istemci `src/generated/prisma/` altında tutulur ve Git'e eklenmez. `src/db/schema.ts` yalnız ortak TypeScript tiplerini içerir; ORM şeması değildir.
@@ -68,17 +85,24 @@ Bu sürüm metin tabanlı webnovel okuyucusudur; manga sayfası yükleme veya pa
 
 ## Neler çalışıyor?
 
+- `/admin/duyurular`: ana sayfada duyuru ekleme, metin/bağlantı düzenleme, sıralama, taslakta tutma, yayımlama ve silme.
+- `/admin/slider`: ana sayfa slaytlarının başlık, açıklama, site içi bağlantı, görsel ve sıra yönetimi. JPG/PNG/WebP dosyaları (en fazla 3 MB) doğrulanıp küçültülerek WebP biçiminde PostgreSQL'de saklanır; yeniden dağıtımda kaybolmaz. Hazır görsel seçimi ve yönetici önizlemesi bulunur. Yayında slayt yoksa mevcut haftanın hikâyesi alanı gösterilir. Duyuru/slider değişiklikleri yetki kontrolü ve işlem kaydıyla saklanır; `20260923000002_site_content` migration'ı gerekir.
+- Kitap sayfasında toplam okunma; profil menüsü ve stüdyodan erişilen `/studio/istatistikler` yazar panelinde kitap/bölüm okunmaları, son 7 gün okunması, kütüphaneye eklenme, görünür yorum ve değerlendirme istatistikleri. Panel yalnız oturum sahibinin kitaplarını gösterir.
+- Okunma, yayımlanmış ücretsiz bölüm metni görünür sekmede açıldığında kaydedilir. Hesap veya misafir tarayıcı başına aynı bölüm UTC gününde bir kez sayılır; eşzamanlı istekler veritabanında tekilleştirilir. Yazarın kendi hesabıyla okumaları, ön yüklemeler, taslak/gizli/kilitli içerik sayılmaz. Kitap toplamı bölüm okumalarının toplamıdır; geçmiş okumalar geriye dönük üretilemez. Misafir kimliği HttpOnly çerezde, istatistik kimliği hash olarak saklanır. Yeni kurulum/güncellemede `npm run db:migrate` çalıştırılmalıdır.
 - Türkçe, mobil uyumlu keşif, arama/tür filtresi, puana göre sıralama ve tamamlanan kitaplar.
 - Kitap sayfası, cilt/bölüm listeleri ve kalıcı bölüm URL'leri.
 - Açık/koyu/sepya okuma, yazı boyutu tercihleri ve bölüm bazlı okuma işareti.
 - Better Auth ile kayıt, giriş, çıkış; e-posta doğrulama ve şifre yenileme sağlayıcı bağlantısı.
 - Navbar profil menüsü: profil, ayarlar, kütüphane, stüdyo ve çıkış; yöneticide yönetim bağlantısı. `/profil` hesap özeti ve hikâyeleri, `/ayarlar` ad güncelleme, şifre değişikliği ve tarayıcıya özel okuma tercihleri sunar. Eski `/hesap` adresi `/profil` sayfasına yönlenir.
 - Kullanıcıya özel kütüphane, 1–5 puan, kitap yorumları ve spoiler gizleme.
+- Kitap yorumlarında beğenme/geri alma ve toplam beğeni sayısı. Doğrulanmış, banlı olmayan hesap başına bir beğeni saklanır; gizli yorumlara ve yayında olmayan kitaplara beğeni eklenemez.
+- Yönetici kullanıcı listesinde doğrudan **Düzenle**, **Banla** ve **Banı kaldır** işlemleri; banlı/aktif filtreleri, gerekçe ve işlem geçmişi. Ban süresizdir ve yönetici tarafından kaldırılır. Ban açık oturumları kapatır, yeni girişi ve uygulama işlemlerini engeller; ban kaldırılınca yeniden giriş gerekir. Kullanıcı ve içerikleri silinmez. Güncelleme için `npm run db:migrate` gerekir.
 - Kitap, cilt ve bölüm oluşturma; Tiptap editörü ve gecikmeli otomatik taslak kaydı.
 - Sürüm çakışması kontrolü: eski sekme yeni metni sessizce ezemez.
 - Taslak/canlı metin ayrımı ve kayıtlarda bölüm sürüm geçmişi.
 - Yayın ve premium başvuruları; değişmeyen başvuru anlık görüntüleri.
 - Yönetici incelemesi, gerekçeli onay/red ve işlem kayıtları.
+- `/admin` sol menülü yönetim alanı: genel bakış, kullanıcılar, kitaplar, başvurular, yorumlar ve işlem geçmişi. Listeler arama, filtre ve 20 kayıtlık sayfalama içerir. Kullanıcı ayrıntılarında ad/rol düzenleme ve tüm oturumları kapatma; kitap ayrıntılarında bilgi, hikâye durumu, vitrin ve görünürlük yönetimi; bölüm ve yorumlarda gerekçeli gizleme/geri açma bulunur. Yönetici rolü için doğrulanmış e-posta gerekir, kendi yetkisini kaldırma engellenir ve rol değişiklikleri hedefin oturumlarını kapatır. Yeni yönetim değişikliği ile işlem kaydı aynı transaction içinde saklanır. Yayın/premium onayları `/admin/basvurular` sayfasındadır.
 - Premium sonrası bölüm fiyatlandırması; premium öncesi yayınları ücretlendirmeyi engelleyen sunucu kuralları.
 - Ücretli/taslak metnin okuyucuya gönderilmemesi; bölüm gövdelerinde ortak önbellek kullanılmaması.
 - SQL migration'ları, ilk yayın/onay tarihini koruyan DB tetikleyicileri ve ilişkisel kısıtlar.
@@ -96,7 +120,7 @@ Başlangıç seed'i 6 kitap, 42 bölüm ve örnek yazar/değerlendirme içerir. 
 npm run db:admin -- admin@ornek.com
 ```
 
-5. Sunucuyu yeniden başlatın; yönetici hesabıyla `/admin` ekranında başvuruyu inceleyip gerekçeyle **Onayla ve yayımla** düğmesine basın.
+5. Sunucuyu yeniden başlatın; yönetici hesabıyla `/admin/basvurular` ekranında başvuruyu inceleyip gerekçeyle **Onayla ve yayımla** düğmesine basın.
 6. Kitap ve başvuruda incelenen en fazla üç örnek bölüm aynı işlemde yayımlanır; kitap Keşfet ve ana sayfanın Son güncellemeler listesine girer. Başvurudan sonra düzenlenen taslaklar ve incelemeye alınmayan bölümler otomatik yayımlanmaz. Sonraki bölümler ve taslak güncellemeleri bölüm editöründen ayrıca yayımlanır. Önceki akıştan kalan `APPROVED` kitaplar için editörden ilk yayın desteği korunur.
 7. Kitap yayımlandıktan sonra premium başvurusu gönderilebilir. E-postası doğrulanmış yönetici, kendi kitabının yayın ve premium başvurularını da onaylayabilir veya reddedebilir. Karar gerekçesi, değerlendiren yönetici ve işlem kaydı saklanır.
 8. Premium onayından **sonra ilk kez yayımlanan** bölümün fiyatı değiştirilebilir. Önceki bölüm düzenlense bile ücretsiz kalır.
@@ -111,7 +135,7 @@ Bu teslim, temel yayın akışının çalışan ilk geliştirme dilimidir; mimar
 - Premium incelemesi bu sürümde editoryal uygunluk/fiyatlandırma akışını gösterir. Sağlayıcı onboarding'i, sözleşmeler ve finans kontrolleri ücretli lansmandan önce tamamlanmalıdır.
 - pg-boss worker, zamanlanmış yayın, transactional outbox ve takip bildirimi henüz eklenmedi.
 - R2 dosya yükleme henüz yok; altı anime kapak illüstrasyonu yerel dosyalardan seçilir.
-- Kitap metadata düzenleme, cilt/bölüm taşıma/sıralama, geçmiş sürüme dönme arayüzü, bölüm yorumları, şikâyet/itiraz, gelişmiş moderasyon ve yönetici MFA sonraki dilimdedir.
+- Yazar stüdyosunda kitap metadata düzenleme, cilt/bölüm taşıma/sıralama, geçmiş sürüme dönme arayüzü, bölüm yorumları, şikâyet/itiraz, gelişmiş moderasyon ve yönetici MFA sonraki dilimdedir. Yöneticiler kitap bilgilerini ve bölüm/yorum görünürlüğünü yönetim panelinden düzenleyebilir.
 - Katalog ilk 60 sonucu, kitap yorumları son 30 yorumu gösterir; büyük katalog için cursor sayfalama gerekir.
 - Okuma ilerlemesi bölüm seviyesindedir; paragraf/scroll konumu eşitlemesi henüz yok.
 - E-posta çağrısı şu an doğrudan Resend'e yapılır; kalıcı teslim kuyruğu eklenmeden üretim bildirim garantisi verilmez.

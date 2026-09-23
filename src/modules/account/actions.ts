@@ -7,6 +7,8 @@ import { getDb } from "@/db";
 import { CATALOG_TAG } from "@/modules/catalog/queries";
 import { getCurrentUser } from "@/lib/session";
 import type { ActionState } from "@/lib/action-state";
+import { DomainError } from "@/modules/publishing/policies";
+import { updateAvatar } from "./service";
 
 export async function updateProfile(
   _: ActionState,
@@ -33,6 +35,44 @@ export async function updateProfile(
     return { ok: true, message: "Profilin güncellendi." };
   } catch {
     return { ok: false, message: "Profilin güncellenemedi. Tekrar dene." };
+  }
+}
+
+export async function updateAvatarAction(
+  _: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  const user = await getCurrentUser();
+  if (!user)
+    return {
+      ok: false,
+      message: "Devam etmek için giriş yapmalısın.",
+      href: "/giris",
+    };
+  const file = form.get("avatar");
+  const remove = form.get("intent") === "remove";
+  try {
+    await updateAvatar(
+      getDb(),
+      user,
+      !remove && file instanceof File ? file : null,
+      remove,
+    );
+    revalidatePath("/", "layout");
+    return {
+      ok: true,
+      message: remove
+        ? "Profil resmin kaldırıldı."
+        : "Profil resmin güncellendi.",
+      nonce: crypto.randomUUID(),
+    };
+  } catch (error) {
+    if (error instanceof DomainError)
+      return { ok: false, message: error.message };
+    console.error("account.avatar.failed", {
+      name: error instanceof Error ? error.name : "UnknownError",
+    });
+    return { ok: false, message: "Profil resmin kaydedilemedi. Tekrar dene." };
   }
 }
 

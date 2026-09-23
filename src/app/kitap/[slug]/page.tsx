@@ -1,10 +1,13 @@
 import { PageSkeleton } from "@/components/loading-skeletons";
+import { getDb } from "@/db";
+import { CommentLikeButton } from "@/components/comment-like-button";
 import { cache, Suspense } from "react";
 import { BlockSkeleton, ButtonSkeleton } from "@/components/loading-skeletons";
 import type { CatalogBook } from "@/modules/catalog/queries";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
+  CHAPTER_PREVIEW_SIZE,
   getBookComments,
   getMyBookState,
   getPublicBook,
@@ -12,6 +15,7 @@ import {
 } from "@/modules/catalog/queries";
 import { getCurrentUser } from "@/lib/session";
 import { BookCover } from "@/components/book-cover";
+import { Avatar } from "@/components/avatar";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { interactAction } from "@/modules/community/actions";
 import {
@@ -19,15 +23,17 @@ import {
   BookOpen,
   Bookmark,
   Check,
-  ChevronDown,
   ChevronRight,
   Crown,
   Feather,
-  LockKeyhole,
+  Heart,
   MessageCircle,
   Star,
 } from "@/components/icons";
-import { date, money } from "@/lib/utils";
+import { date } from "@/lib/utils";
+import { PublicChapterList } from "@/components/public-chapter-list";
+import { Eye } from "lucide-react";
+import { getPublicReadCount } from "@/modules/analytics/queries";
 
 type Props = { params: Promise<{ slug: string }> };
 export async function generateMetadata({ params }: Props) {
@@ -57,6 +63,7 @@ async function BookDetail({ params }: Props) {
           subtitle={book.subtitle}
           author={book.author}
           cover={book.cover}
+          coverUrl={book.coverUrl}
           className="detail-cover"
           sizes="(max-width: 700px) 130px, 220px"
           eager
@@ -91,6 +98,9 @@ async function BookDetail({ params }: Props) {
           </div>
           <p className="detail-description">{book.description}</p>
           <div className="detail-stats">
+            <Suspense fallback={<span>Okunma yükleniyor…</span>}>
+              <ReadCount bookId={book.id} />
+            </Suspense>
             <span>
               <BookOpen size={15} />
               {book.chapterCount} bölüm
@@ -131,7 +141,7 @@ async function BookDetail({ params }: Props) {
             <Suspense
               fallback={<BlockSkeleton label="Bölümler yükleniyor" rows={6} />}
             >
-              <ChapterList bookId={book.id} />
+              <ChapterList book={book} />
             </Suspense>
           </section>
           <section id="yorumlar">
@@ -181,8 +191,17 @@ const getBookInteraction = cache(async (bookId: string) => {
     : { saved: false, score: 0 };
   return { actor, state };
 });
+async function ReadCount({ bookId }: { bookId: string }) {
+  const count = await getPublicReadCount(bookId);
+  return (
+    <span title="Bölümlerin toplam okunması. Aynı okurun aynı bölümü bir UTC gününde bir kez sayılır.">
+      <Eye size={15} />
+      {count.toLocaleString("tr-TR")} okunma
+    </span>
+  );
+}
 async function ReadLink({ bookId }: { bookId: string }) {
-  const chapters = await getPublicChapters(bookId);
+  const chapters = await getPublicChapters(bookId, CHAPTER_PREVIEW_SIZE);
   return (
     <>
       {chapters[0] && (
@@ -220,40 +239,26 @@ async function SaveBook({ bookId }: { bookId: string }) {
     </>
   );
 }
-async function ChapterList({ bookId }: { bookId: string }) {
-  const chapters = await getPublicChapters(bookId);
-  const groups = [...new Set(chapters.map((c) => c.volumeId))].map((id) => ({
-    first: chapters.find((c) => c.volumeId === id)!,
-    chapters: chapters.filter((c) => c.volumeId === id),
-  }));
+async function ChapterList({ book }: { book: CatalogBook }) {
+  const chapters = await getPublicChapters(book.id, CHAPTER_PREVIEW_SIZE);
   return (
     <>
-      {groups.map(({ first, chapters: items }) => (
-        <details className="chapter-group" open key={first.volumeId}>
-          <summary>
-            <ChevronDown size={14} />
-            Cilt {first.volumePosition} · {first.volumeTitle}
-            <small>{items.length} bölüm</small>
-          </summary>
-          {items.map((c) => (
-            <Link href={`/oku/${c.id}`} className="chapter-row" key={c.id}>
-              <span className="chapter-position">
-                {String(c.position).padStart(2, "0")}
-              </span>
-              <span>{c.title}</span>
-              <small>{Math.max(1, Math.ceil(c.wordCount / 200))} dk</small>
-              {c.accessType === "PAID" ? (
-                <span className="label-pill amber">
-                  <LockKeyhole size={11} />
-                  {money(c.priceMinor)}
-                </span>
-              ) : (
-                <ChevronRight size={14} />
-              )}
-            </Link>
-          ))}
-        </details>
-      ))}
+      <PublicChapterList chapters={chapters} />
+      {book.chapterCount > 0 && (
+        <div className="chapter-list-footer">
+          {book.chapterCount > CHAPTER_PREVIEW_SIZE && (
+            <p className="muted">
+              İlk {CHAPTER_PREVIEW_SIZE} bölüm gösteriliyor.
+            </p>
+          )}
+          <Link
+            href={`/kitap/${book.slug}/bolumler`}
+            className="button button-outline"
+          >
+            Tüm bölümleri gör ({book.chapterCount}) <ArrowRight size={15} />
+          </Link>
+        </div>
+      )}
     </>
   );
 }
@@ -336,7 +341,12 @@ async function Comments({ bookId }: { bookId: string }) {
     <div style={{ marginTop: 20 }}>
       {comments.map((comment) => (
         <article className="comment" key={comment.id}>
-          <span className="small-avatar">{comment.name.charAt(0)}</span>
+          <Avatar
+            name={comment.name}
+            url={comment.avatarUrl}
+            className="small-avatar"
+            size={31}
+          />
           <div className="comment-body">
             <div className="comment-meta">
               <strong>{comment.name}</strong>
@@ -352,10 +362,76 @@ async function Comments({ bookId }: { bookId: string }) {
             ) : (
               <p>{comment.body}</p>
             )}
+            <Suspense
+              fallback={
+                <span className="comment-like-button">
+                  <Heart size={15} />
+                  {comment._count.likes.toLocaleString("tr-TR")} beğeni
+                </span>
+              }
+            >
+              <CommentLikeControl
+                bookId={bookId}
+                commentId={comment.id}
+                likeCount={comment._count.likes}
+              />
+            </Suspense>
           </div>
         </article>
       ))}
     </div>
+  );
+}
+
+const getCommentLikeViewer = cache(async (bookId: string) => {
+  const [actor, comments] = await Promise.all([
+    getCurrentUser(),
+    getBookComments(bookId),
+  ]);
+  const likes = actor
+    ? await getDb().commentLike.findMany({
+        where: {
+          userId: actor.id,
+          commentId: { in: comments.map((comment) => comment.id) },
+        },
+        select: { commentId: true },
+      })
+    : [];
+  return { actor, likedIds: new Set(likes.map((like) => like.commentId)) };
+});
+async function CommentLikeControl({
+  bookId,
+  commentId,
+  likeCount,
+}: {
+  bookId: string;
+  commentId: string;
+  likeCount: number;
+}) {
+  const { actor, likedIds } = await getCommentLikeViewer(bookId);
+  if (!actor)
+    return (
+      <Link
+        href="/giris"
+        className="comment-like-button"
+        aria-label="Yorumu beğenmek için giriş yap"
+      >
+        <Heart size={15} />
+        <span>Beğen</span>
+        <span aria-label="Beğeni sayısı">
+          {likeCount.toLocaleString("tr-TR")}
+        </span>
+      </Link>
+    );
+  const liked = likedIds.has(commentId);
+  return (
+    <CommentLikeButton
+      key={`${commentId}:${likeCount}:${liked}`}
+      bookId={bookId}
+      commentId={commentId}
+      likeCount={likeCount}
+      liked={liked}
+    />
   );
 }
 

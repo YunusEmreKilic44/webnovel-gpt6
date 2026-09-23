@@ -27,6 +27,11 @@ import {
   Sparkles,
 } from "lucide-react";
 import { genres, date } from "@/lib/utils";
+import { HomeSlider } from "@/components/home-slider";
+import {
+  getAnnouncements,
+  getHomeSlides,
+} from "@/modules/site-content/queries";
 
 const genreIcons = [Sparkles, Sword, Rocket, Heart, ScanEye, Mountain, Drama];
 const getHomeCatalog = cache(() => getCatalog({ limit: 6 }));
@@ -40,6 +45,9 @@ export default function Home() {
         <HomeHero />
       </Suspense>
       <div className="home-container">
+        <Suspense fallback={null}>
+          <HomeAnnouncements />
+        </Suspense>
         <nav className="genre-tabs" aria-label="Hikâye türleri">
           {genres.map((genre, index) => {
             const Icon = genreIcons[index];
@@ -130,6 +138,14 @@ export default function Home() {
 }
 
 async function HomeHero() {
+  const slides = await getHomeSlides();
+  if (slides.length)
+    return (
+      <HomeSlider
+        key={slides.map((slide) => slide.imageUrl).join(",")}
+        slides={slides}
+      />
+    );
   // Both reads are independent, so the hero never waits on a second round trip
   // to learn which chapter its primary button should open.
   const [catalog, firstChapterId] = await Promise.all([
@@ -214,6 +230,26 @@ async function HomeHero() {
     </section>
   );
 }
+async function HomeAnnouncements() {
+  const announcements = await getAnnouncements();
+  if (!announcements.length) return null;
+  return (
+    <section className="home-announcements" aria-label="Duyurular">
+      <h2>Duyurular</h2>
+      {announcements.map((item) => (
+        <article className="announcement-card" key={item.id}>
+          <h3>{item.title}</h3>
+          <p>{item.body}</p>
+          {item.linkPath && (
+            <Link className="text-link" href={item.linkPath}>
+              {item.linkLabel} <ArrowRight size={15} />
+            </Link>
+          )}
+        </article>
+      ))}
+    </section>
+  );
+}
 async function HomeShelf() {
   const catalog = await getHomeCatalog();
   return (
@@ -246,7 +282,12 @@ async function RecentBooks() {
           className="update-item"
           key={book.id}
         >
-          <BookCover title={book.title} cover={book.cover} sizes="48px" />
+          <BookCover
+            title={book.title}
+            cover={book.cover}
+            coverUrl={book.coverUrl}
+            sizes="48px"
+          />
           <div>
             <h3>{book.title}</h3>
             <p>
@@ -276,7 +317,12 @@ async function RankedBooks() {
           <span className="rank-number">
             {String(index + 1).padStart(2, "0")}
           </span>
-          <BookCover title={book.title} cover={book.cover} sizes="48px" />
+          <BookCover
+            title={book.title}
+            cover={book.cover}
+            coverUrl={book.coverUrl}
+            sizes="48px"
+          />
           <div>
             <h3>{book.title}</h3>
             <p>{book.genre}</p>

@@ -5,9 +5,11 @@ const mocks = vi.hoisted(() => ({
   update: vi.fn(),
   setCookie: vi.fn(),
 }));
+vi.mock("server-only", () => ({}));
 vi.mock("@/lib/session", () => ({ getCurrentUser: mocks.user }));
 vi.mock("@/db", () => ({ getDb: () => ({ user: { update: mocks.update } }) }));
-vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("@/modules/catalog/queries", () => ({ CATALOG_TAG: "catalog" }));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), updateTag: vi.fn() }));
 vi.mock("next/headers", () => ({
   cookies: async () => ({ set: mocks.setCookie }),
 }));

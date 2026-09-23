@@ -1,12 +1,14 @@
 import Image from "next/image";
 import { cn } from "@/lib/utils";
+import { coverPresets } from "@/lib/covers";
 import type { Book } from "@/db/schema";
+import { RemoteImage } from "./remote-image";
 
-const covers = ["ember", "ocean", "forest", "violet", "sand", "rose"];
 export function BookCover({
   title,
   author,
   cover,
+  coverUrl,
   subtitle,
   className,
   sizes = "(max-width: 600px) 44vw, (max-width: 1000px) 28vw, 205px",
@@ -15,22 +17,35 @@ export function BookCover({
   title: string;
   author?: string;
   cover: Book["cover"];
+  /** Uploaded cover; shown as-is (it carries its own title art). */
+  coverUrl?: string | null;
   subtitle?: string;
   className?: string;
   sizes?: string;
   eager?: boolean;
 }) {
-  const artwork = covers.includes(cover) ? cover : "ember";
+  const artwork = (coverPresets as readonly string[]).includes(cover)
+    ? cover
+    : "ember";
+  const imageProps = {
+    fill: true,
+    sizes,
+    loading: eager ? ("eager" as const) : ("lazy" as const),
+    fetchPriority: eager ? ("high" as const) : undefined,
+  };
+  if (coverUrl)
+    return (
+      <div className={cn("book-cover", "has-upload", className)}>
+        <RemoteImage src={coverUrl} alt={`${title} kapağı`} {...imageProps} />
+      </div>
+    );
   return (
     <div className={cn("book-cover", `cover-${artwork}`, className)}>
       <Image
         src={`/art/${artwork}.png`}
         alt={`${title} anime kapak illüstrasyonu`}
-        fill
-        sizes={sizes}
         quality={60}
-        loading={eager ? "eager" : "lazy"}
-        fetchPriority={eager ? "high" : undefined}
+        {...imageProps}
       />
       <div className="cover-caption">
         <span className="cover-series">SATIR ORIGINAL</span>

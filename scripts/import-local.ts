@@ -47,8 +47,13 @@ try {
     const result = [];
     for (const table of tables) {
       // PostgreSQL serializes timestamps directly, preserving microseconds.
+      // Legacy user rows predate bans; provide defaults when importing that schema.
+      const rowData =
+        table === "user"
+          ? "jsonb_build_object('banned', false, 'ban_reason', '', 'banned_at', NULL) || to_jsonb(t)"
+          : "to_jsonb(t)";
       const { rows } = await tx.query<{ data: string; count: number }>(
-        `SELECT COALESCE(json_agg(t), '[]')::text AS data, count(*)::int AS count FROM "${table}" t`,
+        `SELECT COALESCE(json_agg(${rowData}), '[]')::text AS data, count(*)::int AS count FROM "${table}" t`,
       );
       result.push({ table, ...rows[0] });
     }

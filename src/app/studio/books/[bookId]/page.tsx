@@ -10,12 +10,14 @@ import {
   addVolumeAction,
   submitApplicationAction,
 } from "@/modules/publishing/actions";
+import { BookCover } from "@/components/book-cover";
 import {
   ArrowLeft,
   ArrowUpRight,
   CheckCircle2,
   ChevronRight,
   Crown,
+  PenLine,
   Plus,
 } from "@/components/icons";
 import { date } from "@/lib/utils";
@@ -29,24 +31,52 @@ async function StudioBook({ params }: { params: Promise<{ bookId: string }> }) {
         Yazar stüdyosu
       </Link>
       <div className="studio-heading">
-        <div>
-          <div className="eyebrow">
-            <span /> HİKÂYENİN KONTROL ODASI
+        <div className="studio-book-heading">
+          <Link
+            href={`/studio/books/${book.id}/duzenle`}
+            className="studio-book-heading-cover"
+            aria-label="Kapağı ve kitap bilgilerini düzenle"
+          >
+            <BookCover
+              title={book.title}
+              cover={book.cover}
+              coverUrl={book.coverUrl}
+              sizes="72px"
+            />
+          </Link>
+          <div>
+            <div className="eyebrow">
+              <span /> HİKÂYENİN KONTROL ODASI
+            </div>
+            <h1>{book.title}</h1>
+            <p>
+              {book._count.volumes} cilt · {book._count.chapters} bölüm ·{" "}
+              {book.genre}
+            </p>
           </div>
-          <h1>{book.title}</h1>
-          <p>
-            {book._count.volumes} cilt · {book._count.chapters} bölüm ·{" "}
-            {book.genre}
-          </p>
         </div>
-        {book.status === "PUBLISHED" && (
+        <div className="button-row">
+          <Link
+            className="button button-dark button-small"
+            href={`/studio/books/${book.id}/duzenle`}
+          >
+            <PenLine size={14} /> Kitabı düzenle
+          </Link>
           <Link
             className="button button-outline button-small"
-            href={`/kitap/${book.slug}`}
+            href={`/studio/istatistikler?bookId=${encodeURIComponent(book.id)}`}
           >
-            Kitabı gör <ArrowUpRight size={14} />
+            İstatistikleri gör <ArrowUpRight size={14} />
           </Link>
-        )}
+          {book.status === "PUBLISHED" && (
+            <Link
+              className="button button-outline button-small"
+              href={`/kitap/${book.slug}`}
+            >
+              Kitabı gör <ArrowUpRight size={14} />
+            </Link>
+          )}
+        </div>
       </div>
       <div className="split-layout">
         <Suspense

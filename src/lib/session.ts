@@ -6,11 +6,11 @@ import { getAuth } from "./auth";
 
 export const getCurrentUser = cache(async () => {
   const session = await getAuth().api.getSession({ headers: await headers() });
-  if (!session) return null;
+  if (!session || session.user.banned) return null;
   // Better Auth reads the session and its current user from the database.
   // Cookie caching stays disabled: role changes and revoked sessions apply immediately.
-  const { id, name, email, emailVerified, role } = session.user;
-  return { id, name, email, emailVerified, role };
+  const { id, name, email, emailVerified, role, avatarUrl } = session.user;
+  return { id, name, email, emailVerified, role, avatarUrl: avatarUrl ?? null };
 });
 export async function requireUser() {
   const actor = await getCurrentUser();

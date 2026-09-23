@@ -3,11 +3,26 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
-import { Feather, Library, Settings2, ShieldCheck, UserRound } from "./icons";
+import {
+  Feather,
+  Library,
+  LayoutDashboard,
+  Settings2,
+  ShieldCheck,
+  UserRound,
+} from "./icons";
 import { SignOut } from "./sign-out";
 import { useHydrated } from "@/lib/use-hydrated";
+import { cn } from "@/lib/utils";
+import { Avatar } from "./avatar";
+import { RemoteImage } from "./remote-image";
 
-type MenuUser = { name: string; email: string; role: string };
+type MenuUser = {
+  name: string;
+  email: string;
+  role: string;
+  avatarUrl: string | null;
+};
 
 export function ProfileMenu({ user }: { user: MenuUser }) {
   const pathname = usePathname();
@@ -26,6 +41,11 @@ function AccountMenu({ user }: { user: MenuUser }) {
     { href: "/ayarlar", label: "Ayarlar", icon: Settings2 },
     { href: "/kutuphanem", label: "Kütüphanem", icon: Library },
     { href: "/studio", label: "Yazar stüdyosu", icon: Feather },
+    {
+      href: "/studio/istatistikler",
+      label: "Yazar paneli",
+      icon: LayoutDashboard,
+    },
     ...(user.role === "admin"
       ? [{ href: "/admin", label: "Yönetim paneli", icon: ShieldCheck }]
       : []),
@@ -65,7 +85,10 @@ function AccountMenu({ user }: { user: MenuUser }) {
       <button
         ref={trigger}
         type="button"
-        className="avatar profile-menu-trigger"
+        className={cn(
+          "avatar profile-menu-trigger",
+          user.avatarUrl && "has-image",
+        )}
         aria-label="Hesabım"
         aria-haspopup="menu"
         aria-expanded={open}
@@ -83,14 +106,16 @@ function AccountMenu({ user }: { user: MenuUser }) {
           }
         }}
       >
-        {user.name.charAt(0).toLocaleUpperCase("tr-TR")}
+        {user.avatarUrl ? (
+          <RemoteImage src={user.avatarUrl} alt="" fill sizes="40px" />
+        ) : (
+          user.name.charAt(0).toLocaleUpperCase("tr-TR")
+        )}
       </button>
       {open && (
         <div className="profile-dropdown">
           <div className="profile-dropdown-heading">
-            <span className="avatar" aria-hidden="true">
-              {user.name.charAt(0).toLocaleUpperCase("tr-TR")}
-            </span>
+            <Avatar name={user.name} url={user.avatarUrl} />
             <div>
               <strong>{user.name}</strong>
               <span>{user.email}</span>

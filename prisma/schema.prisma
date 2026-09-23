@@ -7,6 +7,42 @@ datasource db {
   provider = "postgresql"
 }
 
+model Announcement {
+  id        String   @id
+  title     String
+  body      String
+  linkPath  String   @default("") @map("link_path")
+  linkLabel String   @default("") @map("link_label")
+  published Boolean  @default(false)
+  position  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@index([published, position])
+  @@map("announcements")
+}
+
+model HomeSlide {
+  id          String   @id
+  title       String
+  description String   @default("")
+  linkPath    String   @default("") @map("link_path")
+  linkLabel   String   @default("") @map("link_label")
+  imagePreset   String   @default("hero") @map("image_preset")
+  /// Legacy in-database image; new uploads go to Cloudinary (imageUrl).
+  imageData     Bytes?   @map("image_data")
+  imageUrl      String?  @map("image_url")
+  imagePublicId String?  @map("image_public_id")
+  imageAlt      String   @default("") @map("image_alt")
+  published   Boolean  @default(false)
+  position    Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@index([published, position])
+  @@map("home_slides")
+}
+
 model Account {
   id                    String    @id
   accountId             String    @map("account_id")
@@ -62,7 +98,10 @@ model Book {
   subtitle               String            @default("")
   description            String
   genre                  String
+  /// Preset artwork; used when no cover image has been uploaded.
   cover                  String            @default("ember")
+  coverUrl               String?           @map("cover_url")
+  coverPublicId          String?           @map("cover_public_id")
   status                 String            @default("DRAFT")
   storyStatus            String            @default("ONGOING") @map("story_status")
   premiumStatus          String            @default("NONE") @map("premium_status")
@@ -123,10 +162,22 @@ model Chapter {
   volumeBook         Volume            @relation("ChapterVolumeBook", fields: [volumeId, bookId], references: [id, bookId], onDelete: NoAction, onUpdate: NoAction, map: "chapter_volume_book_fk")
   chapterRevisions   ChapterRevision[]
   readingProgress    ReadingProgress[]
+  reads              ChapterRead[]
 
   @@unique([volumeId, position], map: "chapters_position_idx")
   @@index([bookId, status], map: "chapters_book_idx")
   @@map("chapters")
+}
+
+model ChapterRead {
+  chapterId String   @map("chapter_id")
+  viewerKey String   @map("viewer_key")
+  readOn    DateTime @map("read_on") @db.Date
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  chapter   Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([chapterId, viewerKey, readOn])
+  @@map("chapter_reads")
 }
 
 model Comment {
@@ -139,9 +190,22 @@ model Comment {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   user      User     @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "comments_user_id_user_id_fk")
   book      Book     @relation(fields: [bookId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "comments_book_id_books_id_fk")
+  likes     CommentLike[]
 
   @@index([bookId, hidden, createdAt], map: "comments_book_visible_created_idx")
   @@map("comments")
+}
+
+model CommentLike {
+  commentId String   @map("comment_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([commentId, userId])
+  @@index([userId], map: "comment_likes_user_idx")
+  @@map("comment_likes")
 }
 
 model LibraryEntry {
@@ -213,7 +277,14 @@ model User {
   email           String
   emailVerified   Boolean           @default(false) @map("email_verified")
   image           String?
+  /// Profile picture on Cloudinary. Server-written only, unlike Better Auth's
+  /// client-updatable `image`, so it can never point at an arbitrary URL.
+  avatarUrl       String?           @map("avatar_url")
+  avatarPublicId  String?           @map("avatar_public_id")
   role            String            @default("reader")
+  banned          Boolean           @default(false)
+  banReason       String            @default("") @map("ban_reason")
+  bannedAt        DateTime?         @map("banned_at") @db.Timestamptz(6)
   createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime          @default(now()) @map("updated_at") @db.Timestamptz(6)
   accounts        Account[]
@@ -221,6 +292,7 @@ model User {
   auditLogs       AuditLog[]
   books           Book[]
   comments        Comment[]
+  commentLikes    CommentLike[]
   libraryEntries  LibraryEntry[]
   ratings         Rating[]
   readingProgress ReadingProgress[]

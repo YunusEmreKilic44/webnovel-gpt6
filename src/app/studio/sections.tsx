@@ -23,6 +23,7 @@ export async function StudioBooks() {
       id: true,
       title: true,
       cover: true,
+      coverUrl: true,
       genre: true,
       status: true,
       premiumStatus: true,
@@ -70,6 +71,7 @@ export async function StudioBooks() {
                   title={book.title}
                   author={actor.name}
                   cover={book.cover}
+                  coverUrl={book.coverUrl}
                 />
                 <div className="studio-book-info">
                   <span className="label-pill">{labels[book.status]}</span>

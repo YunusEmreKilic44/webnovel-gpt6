@@ -174,7 +174,7 @@ test("kayıt, kütüphane, yorum, yayın ve premium onayı", async ({
     .getByRole("button", { name: "Giriş yap", exact: true })
     .click();
   await expect(adminPage).toHaveURL("http://localhost:3100/");
-  await adminPage.goto("/admin");
+  await adminPage.goto("/admin/basvurular");
   const application = adminPage.locator(".application-card").filter({
     has: adminPage.getByRole("heading", {
       name: `Yolculuk ${suffix}`,

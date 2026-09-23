@@ -6,8 +6,10 @@ import { createBookAction } from "@/modules/publishing/actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { ArrowLeft, ArrowRight } from "@/components/icons";
 import { genres } from "@/lib/utils";
+import { coverPresetOptions } from "@/lib/covers";
+import { CoverField } from "@/components/cover-field";
 async function NewBook() {
-  await requireUser();
+  const actor = await requireUser();
   return (
     <div style={{ maxWidth: 770 }}>
       <Link href="/studio" className="breadcrumbs">
@@ -52,36 +54,15 @@ async function NewBook() {
               ))}
             </select>
           </label>
-          <fieldset style={{ border: 0, padding: 0 }}>
-            <legend className="field" style={{ marginBottom: 14 }}>
-              Kapak illüstrasyonu
-            </legend>
-            <div className="cover-picker">
-              {["ember", "ocean", "forest", "violet", "sand", "rose"].map(
-                (color, i) => (
-                  <label className={`cover-choice cover-${color}`} key={color}>
-                    <input
-                      type="radio"
-                      name="cover"
-                      value={color}
-                      defaultChecked={i === 0}
-                      aria-label={
-                        [
-                          "Kızıl kılıç",
-                          "Gökyüzü yolcusu",
-                          "Orman muhafızı",
-                          "Neon şehir",
-                          "Çöl gezgini",
-                          "Bahar hikâyesi",
-                        ][i]
-                      }
-                    />
-                    <span />
-                  </label>
-                ),
-              )}
-            </div>
-          </fieldset>
+          <div className="field">
+            Kapak
+            <CoverField
+              fieldId="new-book-cover"
+              presets={coverPresetOptions}
+              initialPreset="ember"
+              author={actor.name}
+            />
+          </div>
           <div className="notice" style={{ marginTop: 10 }}>
             Kitabın taslak olarak oluşturulur. Okuyuculara açılması için ilk
             bölümünü hazırlayıp yayın başvurusu göndermelisin.

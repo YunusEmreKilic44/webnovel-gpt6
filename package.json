@@ -21,7 +21,8 @@
     "db:admin": "tsx scripts/promote-admin.ts",
     "db:dev": "prisma migrate dev",
     "postinstall": "prisma generate",
-    "db:import-local": "tsx scripts/import-local.ts"
+    "db:import-local": "tsx scripts/import-local.ts",
+    "media:migrate-slides": "tsx --conditions=react-server scripts/migrate-slide-images.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",
@@ -30,6 +31,7 @@
     "@tiptap/react": "^3.31.3",
     "@tiptap/starter-kit": "^3.31.3",
     "better-auth": "^1.7.5",
+    "cloudinary": "^2.11.0",
     "clsx": "^2.1.1",
     "dotenv": "^17.4.2",
     "lucide-react": "^1.46.0",
@@ -38,9 +40,11 @@
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "server-only": "^0.0.1",
+    "sharp": "^0.35.4",
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@playwright/test": "^1.63.0",
     "@rolldown/binding-win32-x64-msvc": "^1.2.9",
     "@tailwindcss/postcss": "^4.3.3",
@@ -50,14 +54,13 @@
     "@types/react-dom": "^19.3.0",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.3.5",
+    "pglite-prisma-adapter": "^0.7.2",
     "prettier": "^3.9.7",
     "prisma": "^7.10.0",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.13",
     "typescript": "^6.0.3",
-    "vitest": "^5.0.1",
-    "@electric-sql/pglite": "^0.5.8",
-    "pglite-prisma-adapter": "^0.7.2"
+    "vitest": "^5.0.1"
   },
   "optionalDependencies": {
     "@rolldown/binding-win32-x64-msvc": "^1.2.9"

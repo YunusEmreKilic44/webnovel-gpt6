@@ -1,159 +1,108 @@
-import { cache, Suspense } from "react";
-import { BlockSkeleton, ButtonSkeleton } from "@/components/loading-skeletons";
-import { notFound } from "next/navigation";
-import { getDb } from "@/db";
-import type { ApplicationSnapshot } from "@/db/schema";
-import { requireUser } from "@/lib/session";
-import { ActionForm, SubmitButton } from "@/components/action-form";
-import { reviewApplicationAction } from "@/modules/publishing/actions";
-import { RichText } from "@/components/rich-text";
-import { CheckCircle2, ShieldCheck } from "@/components/icons";
-import { date } from "@/lib/utils";
-export const metadata = {
-  title: "Başvurular",
-  robots: { index: false, follow: false },
-};
-export default function Admin() {
+import Link from "next/link";
+import { Suspense } from "react";
+import { BlockSkeleton } from "@/components/loading-skeletons";
+import {
+  AdminHeading,
+  AdminEmpty,
+  auditLabels,
+  fullDate,
+} from "@/components/admin-ui";
+import { getAdminOverview } from "@/modules/admin/queries";
+import { ArrowRight } from "@/components/icons";
+
+export default function AdminPage() {
   return (
-    <>
-      <div className="studio-heading">
-        <div>
-          <div className="eyebrow">
-            <ShieldCheck size={13} /> YÖNETİM ALANI
-          </div>
-          <h1>Yeni dünyalar kapıda.</h1>
-          <p>
-            Yayın ve premium başvurularını, gönderildiği andaki sürümleriyle
-            incele.
-          </p>
-        </div>
-        <Suspense
-          fallback={<ButtonSkeleton label="Başvuru sayısı yükleniyor" />}
-        >
-          <PendingCount />
-        </Suspense>
-      </div>
-      <div className="notice" style={{ marginBottom: 23 }}>
-        Premium değerlendirmesi bu sürümde yalnız bölüm fiyatlandırma yetkisini
-        açar. Gerçek tahsilat ve yazar ödemeleri henüz etkin değildir.
-      </div>
-      <Suspense
-        fallback={<BlockSkeleton label="Başvurular yükleniyor" rows={8} />}
-      >
-        <Applications />
-      </Suspense>
-    </>
+    <Suspense
+      fallback={<BlockSkeleton label="Yönetim özeti yükleniyor" rows={8} />}
+    >
+      <Overview />
+    </Suspense>
   );
 }
-
-const requireAdmin = cache(async () => {
-  const actor = await requireUser();
-  if (actor.role !== "admin" || !actor.emailVerified) notFound();
-  return actor;
-});
-async function PendingCount() {
-  await requireAdmin();
-  const count = await getDb().application.count({
-    where: { status: "PENDING" },
-  });
-  return <span className="label-pill amber">{count} bekleyen başvuru</span>;
-}
-
-async function Applications() {
-  await requireAdmin();
-  const rows = await getDb().application.findMany({
-    include: {
-      book: { select: { author: { select: { name: true } } } },
+async function Overview() {
+  const stats = await getAdminOverview();
+  const cards = [
+    { title: "Kullanıcılar", value: stats.users, href: "/admin/kullanicilar" },
+    { title: "Kitaplar", value: stats.books, href: "/admin/kitaplar" },
+    {
+      title: "Yayındaki kitap",
+      value: stats.published,
+      href: "/admin/kitaplar?filter=PUBLISHED",
     },
-    orderBy: { createdAt: "desc" },
-    take: 100,
-  });
-  const queue = rows.map(({ book, ...application }) => ({
-    application: {
-      ...application,
-      snapshot: application.snapshot as ApplicationSnapshot,
+    {
+      title: "Bekleyen başvuru",
+      value: stats.pending,
+      href: "/admin/basvurular?filter=PENDING",
     },
-    author: book.author.name,
-  }));
+    {
+      title: "Gizlenen yorum",
+      value: stats.hiddenComments,
+      href: "/admin/yorumlar?filter=hidden",
+    },
+    {
+      title: "Toplam bölüm okunması",
+      value: stats.reads,
+      href: "/admin/kitaplar",
+    },
+  ];
   return (
-    <div className="stack">
-      {queue.length ? (
-        queue.map(({ application: a, author }) => (
-          <article className="application-card" key={a.id}>
-            <header>
-              <span className="label-pill">
-                {a.type === "PUBLICATION"
-                  ? "Yayın başvurusu"
-                  : "Premium başvurusu"}
-              </span>
-              <span className="muted" style={{ fontSize: 11 }}>
-                {date(a.createdAt)} ·{" "}
-                {
-                  {
-                    PENDING: "İnceleniyor",
-                    APPROVED: "Onaylandı",
-                    REJECTED: "Reddedildi",
-                  }[a.status as "PENDING" | "APPROVED" | "REJECTED"]
-                }
-              </span>
-            </header>
-            <h2>{a.snapshot.title}</h2>
-            <p>
-              {author} · {a.snapshot.genre}
-            </p>
-            <p style={{ marginTop: 10 }}>{a.snapshot.description}</p>
-            {a.snapshot.chapters.map((chapter) => (
-              <details key={chapter.id}>
-                <summary>
-                  {chapter.title} · Başvuru sürümü {chapter.version}
-                </summary>
-                <RichText content={chapter.content} />
-              </details>
-            ))}
-            {a.status === "PENDING" ? (
-              <ActionForm
-                action={reviewApplicationAction}
-                className="form-stack"
-              >
-                <input type="hidden" name="applicationId" value={a.id} />
-                <label className="field">
-                  Karar gerekçesi
-                  <textarea
-                    name="note"
-                    required
-                    minLength={5}
-                    maxLength={2000}
-                    placeholder="İnceleme sonucunu yazara açıkla…"
-                  />
-                </label>
-                <div className="button-row">
-                  <SubmitButton name="decision" value="APPROVED">
-                    <CheckCircle2 size={15} />
-                    {a.type === "PUBLICATION" ? "Onayla ve yayımla" : "Onayla"}
-                  </SubmitButton>
-                  <SubmitButton
-                    name="decision"
-                    value="REJECTED"
-                    className="button-danger"
-                  >
-                    Reddet
-                  </SubmitButton>
-                </div>
-              </ActionForm>
-            ) : (
-              <p style={{ marginTop: 15 }}>
-                {a.note || "Başvuru değerlendirildi."}
-              </p>
-            )}
-          </article>
-        ))
-      ) : (
-        <div className="empty-state">
-          <CheckCircle2 size={34} />
-          <h2>Şimdilik her şey sakin.</h2>
-          <p>Yazarların başvuruları burada görünecek.</p>
+    <>
+      <AdminHeading
+        title="Genel bakış"
+        description="Platformdaki hareketleri takip et, bekleyen işlemlere buradan ulaş."
+      />
+      <div className="admin-stat-grid">
+        {cards.map((card) => (
+          <Link className="admin-stat-card" href={card.href} key={card.title}>
+            <span>{card.title}</span>
+            <strong>{card.value.toLocaleString("tr-TR")}</strong>
+            <ArrowRight size={16} />
+          </Link>
+        ))}
+      </div>
+      <section className="panel admin-callout">
+        <div>
+          <h2>
+            {stats.pending
+              ? `${stats.pending} başvuru inceleme bekliyor.`
+              : "Başvuru kuyruğu güncel."}
+          </h2>
+          <p>Yayın ve premium kararlarını gerekçeleriyle kaydet.</p>
         </div>
-      )}
-    </div>
+        <Link
+          className="button button-dark"
+          href="/admin/basvurular?filter=PENDING"
+        >
+          Başvurulara git
+          <ArrowRight size={15} />
+        </Link>
+      </section>
+      <section className="panel">
+        <div className="analytics-section-heading">
+          <h2>Son işlemler</h2>
+          <Link className="text-link" href="/admin/islem-kaydi">
+            Tümünü gör
+            <ArrowRight size={14} />
+          </Link>
+        </div>
+        {stats.recent.length ? (
+          <ul className="admin-activity">
+            {stats.recent.map((entry) => (
+              <li key={entry.id}>
+                <div>
+                  <strong>{auditLabels[entry.action] ?? entry.action}</strong>
+                  <span>{entry.actor.name}</span>
+                </div>
+                <time dateTime={entry.createdAt.toISOString()}>
+                  {fullDate(entry.createdAt)}
+                </time>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <AdminEmpty text="Henüz kaydedilmiş işlem yok." />
+        )}
+      </section>
+    </>
   );
 }

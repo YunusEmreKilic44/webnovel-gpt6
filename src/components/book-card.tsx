@@ -10,6 +10,7 @@ export function BookCard({ book }: { book: CatalogBook }) {
         <BookCover
           title={book.title}
           cover={book.cover}
+          coverUrl={book.coverUrl}
           author={book.author}
           subtitle={book.subtitle}
         />

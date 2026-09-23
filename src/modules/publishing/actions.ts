@@ -48,11 +48,46 @@ async function run(
   }
 }
 const value = (form: FormData, key: string) => String(form.get(key) ?? "");
+const fileField = (form: FormData, key: string) => {
+  const file = form.get(key);
+  return file instanceof File ? file : null;
+};
 export async function createBookAction(_: ActionState, form: FormData) {
   return run(async (actor) => {
-    const input = service.bookInput.parse(Object.fromEntries(form));
-    const bookId = await service.createBook(getDb(), actor, input);
+    const input = service.bookInput.parse({
+      title: value(form, "title"),
+      description: value(form, "description"),
+      genre: value(form, "genre"),
+      cover: value(form, "cover"),
+    });
+    const bookId = await service.createBook(
+      getDb(),
+      actor,
+      input,
+      fileField(form, "coverImage"),
+    );
     return { message: "Yeni hikâyen hazır.", href: `/studio/books/${bookId}` };
+  });
+}
+export async function updateBookDetailsAction(_: ActionState, form: FormData) {
+  return run(async (actor) => {
+    const input = service.bookDetailsInput.parse({
+      bookId: value(form, "bookId"),
+      title: value(form, "title"),
+      subtitle: value(form, "subtitle"),
+      description: value(form, "description"),
+      genre: value(form, "genre"),
+      storyStatus: value(form, "storyStatus"),
+      cover: value(form, "cover"),
+      removeCoverImage: form.get("removeCoverImage") === "on",
+    });
+    await service.updateBookDetails(
+      getDb(),
+      actor,
+      input,
+      fileField(form, "coverImage"),
+    );
+    return { message: "Kitap bilgileri kaydedildi." };
   });
 }
 export async function addVolumeAction(_: ActionState, form: FormData) {

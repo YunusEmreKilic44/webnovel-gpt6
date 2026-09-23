@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { PGlite } from "@electric-sql/pglite";
-import { migrateLocal } from "./support/migrate";
+import { migrateLocal, migrationFiles } from "./support/migrate";
 import { createLocalDatabase } from "./support/database";
 
 describe("Prisma SQL migration'ları", () => {
@@ -20,7 +20,7 @@ describe("Prisma SQL migration'ları", () => {
       ).toMatchObject({ name: "Mevcut Kullanıcı" });
       expect(
         (await client.query('SELECT * FROM "_prisma_migrations"')).rows,
-      ).toHaveLength(3);
+      ).toHaveLength((await migrationFiles()).length);
       const triggers = await client.query(
         "SELECT tgname FROM pg_trigger WHERE tgname IN ('chapter_first_publication_immutable', 'book_first_premium_approval_immutable')",
       );

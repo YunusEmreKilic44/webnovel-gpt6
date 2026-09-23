@@ -24,6 +24,7 @@ export function NavProgress() {
     if (settled.current === current) return;
     settled.current = current;
     setPending(false);
+    setVisible(false);
   }, [current]);
 
   useEffect(() => {
@@ -69,12 +70,12 @@ export function NavProgress() {
   }, []);
 
   useEffect(() => {
-    if (!pending) {
-      setVisible(false);
-      return;
-    }
+    if (!pending) return;
     const reveal = setTimeout(() => setVisible(true), SHOW_AFTER_MS);
-    const giveUp = setTimeout(() => setPending(false), GIVE_UP_AFTER_MS);
+    const giveUp = setTimeout(() => {
+      setPending(false);
+      setVisible(false);
+    }, GIVE_UP_AFTER_MS);
     return () => {
       clearTimeout(reveal);
       clearTimeout(giveUp);
@@ -84,7 +85,7 @@ export function NavProgress() {
   return (
     <div
       className="nav-progress"
-      data-active={visible ? "true" : undefined}
+      data-active={pending && visible ? "true" : undefined}
       aria-hidden="true"
     />
   );

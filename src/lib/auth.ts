@@ -3,6 +3,7 @@ import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { getDb } from "@/db";
 import { isLocalPreview } from "./auth-preview";
+import { assertSessionAllowed } from "./ban-policy";
 export { isLocalPreview } from "./auth-preview";
 async function sendEmail(to: string, subject: string, url: string) {
   if (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM)
@@ -38,6 +39,9 @@ function createAuth() {
     user: {
       additionalFields: {
         role: { type: "string", defaultValue: "reader", input: false },
+        banned: { type: "boolean", defaultValue: false, input: false },
+        // Read with the session so the header avatar needs no extra query.
+        avatarUrl: { type: "string", required: false, input: false },
       },
     },
     emailAndPassword: {
@@ -54,6 +58,13 @@ function createAuth() {
         sendEmail(user.email, "Satır · E-postanı doğrula", url),
     },
     databaseHooks: {
+      session: {
+        create: {
+          before: async (session) => {
+            await assertSessionAllowed(session.userId);
+          },
+        },
+      },
       user: {
         create: {
           before: async (value) => ({

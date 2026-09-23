@@ -12,6 +12,14 @@ import {
   requireVerified,
 } from "./policies";
 import { slugify } from "@/lib/utils";
+import {
+  deleteImage,
+  mediaFolder,
+  uploadImage,
+  type StoredImage,
+} from "@/lib/cloudinary";
+import { prepareImage } from "@/lib/image-upload";
+import { coverPresets } from "@/lib/covers";
 
 export const bookInput = z.object({
   title: z
@@ -32,7 +40,7 @@ export const bookInput = z.object({
     "Macera",
     "Dram",
   ]),
-  cover: z.enum(["ember", "ocean", "forest", "violet", "sand", "rose"]),
+  cover: z.enum(coverPresets),
 });
 const titleInput = z
   .string()
@@ -66,20 +74,120 @@ async function databaseTime(tx: Transaction) {
   return row.at;
 }
 
+export const prepareCoverImage = (file: File | null) =>
+  prepareImage(file, { width: 1200, height: 1800 });
+
+/**
+ * Uploads outside the transaction (no row lock held on network I/O), then
+ * removes whichever asset is no longer referenced once `work` has settled.
+ */
+async function withCoverUpload<T>(
+  file: File | null | undefined,
+  work: (
+    uploaded: StoredImage | null,
+  ) => Promise<{ result: T; replacedPublicId?: string | null }>,
+) {
+  const prepared = await prepareCoverImage(file ?? null);
+  const uploaded = prepared
+    ? await uploadImage(prepared, mediaFolder("covers"))
+    : null;
+  try {
+    const { result, replacedPublicId } = await work(uploaded);
+    await deleteImage(replacedPublicId);
+    return result;
+  } catch (error) {
+    await deleteImage(uploaded?.publicId);
+    throw error;
+  }
+}
+
 export async function createBook(
   db: Database,
   actor: Actor,
   input: z.infer<typeof bookInput>,
+  coverImage?: File | null,
 ) {
   requireVerified(actor);
   const data = bookInput.parse(input);
   const bookId = id();
+  await withCoverUpload(coverImage, async (uploaded) => ({
+    result: await createBookRows(db, actor, bookId, data, uploaded),
+  }));
+  return bookId;
+}
+
+export const bookDetailsInput = bookInput.extend({
+  bookId: z.string().min(1).max(128),
+  subtitle: z.string().trim().max(120).default(""),
+  storyStatus: z.enum(["ONGOING", "COMPLETED", "HIATUS"]),
+  removeCoverImage: z.boolean().default(false),
+});
+
+/**
+ * The author edits their book: title, subtitle, description, genre, story
+ * status and cover (preset, upload, replace or remove). The slug is kept so
+ * shared links keep working.
+ */
+export async function updateBookDetails(
+  db: Database,
+  actor: Actor,
+  raw: z.input<typeof bookDetailsInput>,
+  coverImage?: File | null,
+) {
+  requireVerified(actor);
+  const { bookId, removeCoverImage, ...data } = bookDetailsInput.parse(raw);
+  return withCoverUpload(coverImage, async (uploaded) => {
+    let replacedPublicId: string | null = null;
+    await db.$transaction(async (tx) => {
+      const book = await lockBook(tx, bookId);
+      requireOwner(actor, book);
+      const image = uploaded
+        ? { coverUrl: uploaded.url, coverPublicId: uploaded.publicId }
+        : removeCoverImage
+          ? { coverUrl: null, coverPublicId: null }
+          : {};
+      if ("coverUrl" in image) replacedPublicId = book.coverPublicId;
+      await tx.book.update({
+        where: { id: book.id },
+        data: { ...data, ...image, updatedAt: new Date() },
+      });
+      const changed: string[] = (
+        Object.keys(data) as (keyof typeof data)[]
+      ).filter((key) => book[key] !== data[key]);
+      if (uploaded) changed.push("coverImage");
+      else if ("coverUrl" in image && book.coverUrl)
+        changed.push("coverImageRemoved");
+      await tx.auditLog.create({
+        data: {
+          id: id(),
+          actorId: actor.id,
+          targetId: book.id,
+          action: "book.updated",
+          detail: changed.length
+            ? `Değişen alanlar: ${changed.join(", ")}`
+            : "Değişiklik yok",
+        },
+      });
+    });
+    return { result: undefined, replacedPublicId };
+  });
+}
+
+async function createBookRows(
+  db: Database,
+  actor: Actor,
+  bookId: string,
+  data: z.infer<typeof bookInput>,
+  uploaded: StoredImage | null,
+) {
   await db.$transaction(async (tx) => {
     await tx.book.create({
       data: {
         id: bookId,
         authorId: actor.id,
         ...data,
+        coverUrl: uploaded?.url,
+        coverPublicId: uploaded?.publicId,
         slug: `${slugify(data.title)}-${bookId.slice(0, 8)}`,
       },
     });

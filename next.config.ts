@@ -8,7 +8,7 @@ const nextConfig: NextConfig = {
     formats: ["image/avif", "image/webp"],
     minimumCacheTTL: 2678400,
   },
-  experimental: { serverActions: { bodySizeLimit: "1mb" } },
+  experimental: { serverActions: { bodySizeLimit: "4mb" } },
   async headers() {
     return [
       {

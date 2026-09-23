@@ -10,6 +10,10 @@ try {
       throw new Error("Önce siteden bu e-posta adresiyle hesap oluşturun.");
     if (!actor.emailVerified)
       throw new Error("Önce e-posta adresini doğrulayın.");
+    if (actor.banned)
+      throw new Error(
+        "Yönetici yetkisi vermeden önce hesabın banını kaldırın.",
+      );
     await tx.user.updateMany({
       where: { id: actor.id },
       data: { role: "admin" },

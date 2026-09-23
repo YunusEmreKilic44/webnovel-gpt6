@@ -61,6 +61,8 @@ export function AuthForm({
                 });
       if (result.error) {
         const messages: Record<string, string> = {
+          BANNED_USER:
+            "Hesabın banlandı. Ban kaldırılana kadar giriş yapamazsın.",
           INVALID_EMAIL_OR_PASSWORD: "E-posta veya şifre hatalı.",
           USER_ALREADY_EXISTS: "Bu e-posta adresiyle bir hesap zaten var.",
           USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL:

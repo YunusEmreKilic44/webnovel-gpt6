@@ -7,7 +7,12 @@ export async function ShellAccount() {
   const user = await getCurrentUser();
   return user ? (
     <ProfileMenu
-      user={{ name: user.name, email: user.email, role: user.role }}
+      user={{
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        avatarUrl: user.avatarUrl,
+      }}
     />
   ) : (
     <Link href="/giris" className="button button-dark button-small">

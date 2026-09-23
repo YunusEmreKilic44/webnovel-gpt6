@@ -4,6 +4,7 @@ import { getDb } from "@/db";
 import { getCurrentUser } from "@/lib/session";
 import { getReaderNeighbours } from "@/modules/catalog/reader-queries";
 import { RichText } from "@/components/rich-text";
+import { ChapterReadTracker } from "@/components/chapter-read-tracker";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import {
   ArrowLeft,
@@ -36,7 +37,10 @@ export async function ChapterBody(props: {
     <>
       {" "}
       {content ? (
-        <RichText content={content} />
+        <>
+          <RichText content={content} />
+          <ChapterReadTracker chapterId={props.chapterId} />
+        </>
       ) : (
         <div className="locked-chapter">
           <LockKeyhole size={35} />
