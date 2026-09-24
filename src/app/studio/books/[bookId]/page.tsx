@@ -11,10 +11,13 @@ import {
   submitApplicationAction,
 } from "@/modules/publishing/actions";
 import { BookCover } from "@/components/book-cover";
+import { getPremiumProgress } from "@/modules/premium/requirements";
+import { getFeatureFlags } from "@/modules/features/flags";
 import {
   ArrowLeft,
   ArrowUpRight,
   CheckCircle2,
+  Circle,
   ChevronRight,
   Crown,
   PenLine,
@@ -51,7 +54,7 @@ async function StudioBook({ params }: { params: Promise<{ bookId: string }> }) {
             <h1>{book.title}</h1>
             <p>
               {book._count.volumes} cilt · {book._count.chapters} bölüm ·{" "}
-              {book.genre}
+              {book.genres.join(" · ")}
             </p>
           </div>
         </div>
@@ -209,17 +212,41 @@ async function StudioChapters({ bookId }: { bookId: string }) {
 
 async function StudioApplications({ bookId }: { bookId: string }) {
   const book = await ownedBook(bookId);
-  const history = await getDb().application.findMany({
-    where: { bookId },
-    select: { id: true, type: true, status: true, note: true, createdAt: true },
-    orderBy: { createdAt: "desc" },
-  });
+  const db = getDb();
+  const [history, firstChapter, premium, flags] = await Promise.all([
+    db.application.findMany({
+      where: { bookId },
+      select: {
+        id: true,
+        type: true,
+        status: true,
+        note: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+    // The opening chapter in reading order is sent with the application.
+    db.chapter.findFirst({
+      where: { bookId, hidden: false },
+      orderBy: [{ volume: { position: "asc" } }, { position: "asc" }],
+      select: { id: true, title: true, wordCount: true },
+    }),
+    getPremiumProgress(db, bookId),
+    getFeatureFlags(),
+  ]);
+  const firstReady = (firstChapter?.wordCount ?? 0) >= 30;
   const publicationPending = history.some(
     (a) => a.type === "PUBLICATION" && a.status === "PENDING",
   );
   const premiumPending = history.some(
     (a) => a.type === "PREMIUM" && a.status === "PENDING",
   );
+  // Closed from the admin panel: no requirements, no form, just a notice.
+  const premiumOpen =
+    flags.premiumApplications &&
+    book.status === "PUBLISHED" &&
+    book.premiumStatus !== "ACTIVE" &&
+    !premiumPending;
   return (
     <aside className="stack">
       <section className="panel">
@@ -236,8 +263,33 @@ async function StudioApplications({ bookId }: { bookId: string }) {
               ? "Başvurun onaylandı. İncelenen ilk bölümünü editörden yayımlayabilirsin."
               : publicationPending
                 ? "Başvurun inceleniyor. İncelemeye gönderilen sürüm korunur; kararını burada göreceksin."
-                : "Hazır olduğunda hikâyeni incelemeye gönder. En az 30 kelimelik bir örnek bölüm gerekli."}
+                : "Hazır olduğunda hikâyeni incelemeye gönder. İlk bölümün de incelemeye gönderilir."}
         </p>
+        {book.status === "DRAFT" && !publicationPending && (
+          <p
+            className={`requirement ${firstReady ? "is-met" : ""}`}
+            role="status"
+          >
+            {firstReady ? <CheckCircle2 size={15} /> : <Circle size={15} />}
+            {firstChapter ? (
+              <>
+                İlk bölüm:{" "}
+                <Link
+                  className="text-link"
+                  href={`/studio/books/${bookId}/chapters/${firstChapter.id}`}
+                >
+                  {firstChapter.title}
+                </Link>{" "}
+                ·{" "}
+                {firstReady
+                  ? "gönderilmeye hazır"
+                  : `${firstChapter.wordCount}/30 kelime`}
+              </>
+            ) : (
+              "Önce bir bölüm eklemelisin."
+            )}
+          </p>
+        )}
         {book.status === "DRAFT" && !publicationPending && (
           <ActionForm action={submitApplicationAction} className="form-stack">
             <input type="hidden" name="bookId" value={bookId} />
@@ -255,26 +307,65 @@ async function StudioApplications({ bookId }: { bookId: string }) {
         <h2>Bir adım ötesi</h2>
         <p>
           {book.premiumStatus === "ACTIVE"
-            ? "Premium yetkin aktif. Onaydan sonra ilk kez yayımlanan bölümler için editörde fiyat belirleyebilirsin."
+            ? "Premium yetkin aktif. Onaydan sonra ilk kez yayımlanan bölümleri editörde premium yapabilirsin; okurlar sabit coin fiyatıyla açar."
             : premiumPending
               ? "Premium başvurun inceleniyor."
               : "Premium onayı ile yeni bölümlerini ücretli yapabilirsin. Önceden yayımladığın bölümler ücretsiz kalır."}
         </p>
-        {book.status === "PUBLISHED" &&
+        {!flags.premiumApplications &&
           book.premiumStatus !== "ACTIVE" &&
           !premiumPending && (
-            <ActionForm action={submitApplicationAction} className="form-stack">
-              <input type="hidden" name="bookId" value={bookId} />
-              <input type="hidden" name="type" value="PREMIUM" />
-              <label className="check-field" style={{ marginTop: 15 }}>
-                <input name="rights" type="checkbox" required />
-                Yayın hakları ve premium kurallarını kabul ediyorum.
-              </label>
-              <SubmitButton className="button-outline">
-                Premium başvurusu
-              </SubmitButton>
-            </ActionForm>
+            <p className="requirement-note premium-closed">
+              Premium başvuruları şu an kapalı. Açıldığında buradan
+              başvurabileceksin.
+            </p>
           )}
+        {premiumOpen && (
+          <ul
+            className="requirement-list"
+            aria-label="Premium başvuru şartları"
+          >
+            <li
+              className={`requirement ${premium.chapters >= premium.minChapters ? "is-met" : ""}`}
+            >
+              {premium.chapters >= premium.minChapters ? (
+                <CheckCircle2 size={15} />
+              ) : (
+                <Circle size={15} />
+              )}
+              Yayında bölüm: {premium.chapters} / {premium.minChapters}
+            </li>
+            <li
+              className={`requirement ${premium.reads >= premium.minReads ? "is-met" : ""}`}
+            >
+              {premium.reads >= premium.minReads ? (
+                <CheckCircle2 size={15} />
+              ) : (
+                <Circle size={15} />
+              )}
+              Okunma: {premium.reads.toLocaleString("tr-TR")} /{" "}
+              {premium.minReads.toLocaleString("tr-TR")}
+            </li>
+            {!premium.eligible && (
+              <li className="requirement-note">
+                Şartları sağladığında premium başvurusu yapabilirsin.
+              </li>
+            )}
+          </ul>
+        )}
+        {premiumOpen && premium.eligible && (
+          <ActionForm action={submitApplicationAction} className="form-stack">
+            <input type="hidden" name="bookId" value={bookId} />
+            <input type="hidden" name="type" value="PREMIUM" />
+            <label className="check-field" style={{ marginTop: 15 }}>
+              <input name="rights" type="checkbox" required />
+              Yayın hakları ve premium kurallarını kabul ediyorum.
+            </label>
+            <SubmitButton className="button-outline">
+              Premium başvurusu
+            </SubmitButton>
+          </ActionForm>
+        )}
         {book.firstPremiumApprovedAt && (
           <p style={{ marginTop: 12 }}>
             İlk onay: {date(book.firstPremiumApprovedAt)}

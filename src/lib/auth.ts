@@ -42,6 +42,8 @@ function createAuth() {
         banned: { type: "boolean", defaultValue: false, input: false },
         // Read with the session so the header avatar needs no extra query.
         avatarUrl: { type: "string", required: false, input: false },
+        // Never client-writable; only src/modules/coins changes it.
+        coinBalance: { type: "number", defaultValue: 0, input: false },
       },
     },
     emailAndPassword: {

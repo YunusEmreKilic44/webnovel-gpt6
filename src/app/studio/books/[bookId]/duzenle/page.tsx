@@ -3,7 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDb } from "@/db";
 import { requireUser } from "@/lib/session";
-import { genres } from "@/lib/utils";
+import { GenreField } from "@/components/genre-field";
+import { TagField } from "@/components/tag-field";
+import { bookTagSelection, tagNames } from "@/modules/catalog/tags";
 import { coverPresetOptions } from "@/lib/covers";
 import { updateBookDetailsAction } from "@/modules/publishing/actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
@@ -33,7 +35,8 @@ async function EditBook({ params }: Props) {
       title: true,
       subtitle: true,
       description: true,
-      genre: true,
+      genres: true,
+      tags: bookTagSelection,
       storyStatus: true,
       status: true,
       cover: true,
@@ -51,8 +54,8 @@ async function EditBook({ params }: Props) {
         <div>
           <h1>Kitabı düzenle</h1>
           <p>
-            Adı, açıklaması, türü ve kapağı değiştirebilirsin. Kitabın bağlantı
-            adresi aynı kalır.
+            Adı, açıklaması, kategorileri, etiketleri ve kapağı
+            değiştirebilirsin. Kitabın bağlantı adresi aynı kalır.
           </p>
         </div>
       </div>
@@ -90,15 +93,12 @@ async function EditBook({ params }: Props) {
             />
             <small>En az 30 karakter.</small>
           </label>
+          <GenreField key={book.genres.join("|")} defaultValue={book.genres} />
+          <TagField
+            key={tagNames(book.tags).join("|")}
+            defaultValue={tagNames(book.tags)}
+          />
           <div className="form-grid">
-            <label className="field">
-              Tür
-              <select name="genre" defaultValue={book.genre}>
-                {genres.slice(1).map((genre) => (
-                  <option key={genre}>{genre}</option>
-                ))}
-              </select>
-            </label>
             <label className="field">
               Hikâye durumu
               <select name="storyStatus" defaultValue={book.storyStatus}>

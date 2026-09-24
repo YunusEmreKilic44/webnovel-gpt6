@@ -9,6 +9,7 @@ import {
 } from "vitest";
 import { PGlite } from "@electric-sql/pglite";
 import sharp from "sharp";
+import { readFile } from "node:fs/promises";
 import { getDb } from "@/db";
 import { deleteImage, uploadImage } from "@/lib/cloudinary";
 import { createLocalDatabase } from "./support/database";
@@ -93,6 +94,66 @@ beforeEach(async () => {
 afterAll(close);
 
 describe("Duyuru ve slider yönetimi", () => {
+  it("otomatik katalog sayfalarını bir kez düzenlenebilir slaytlara taşır", async () => {
+    const sql = await readFile(
+      "prisma/migrations/20260926000000_managed_home_slides/migration.sql",
+      "utf8",
+    );
+    await db.book.createMany({
+      data: Array.from({ length: 8 }, (_, index) => ({
+        id: `slider-book-${index}`,
+        slug: `slider-book-${index}`,
+        authorId: admin.id,
+        title: `Kitap ${index}`,
+        description: "Kitap açıklaması",
+        genres: ["Fantastik"],
+        status: index === 7 ? "DRAFT" : "PUBLISHED",
+        featured: index === 0,
+        cover: index === 0 ? "ember" : "forest",
+        coverUrl:
+          index === 1
+            ? "https://res.cloudinary.com/demo/image/upload/book.webp"
+            : null,
+        updatedAt: new Date(2026, 0, 10 - index),
+      })),
+    });
+    try {
+      await client.exec(sql);
+      const slides = await getHomeSlides();
+      expect(slides).toHaveLength(6);
+      expect(slides.map((item) => item.title)).toEqual(
+        Array.from({ length: 6 }, (_, i) => `Kitap ${i}`),
+      );
+      expect(slides[0]).toMatchObject({
+        imagePreset: "hero",
+        linkPath: "/kitap/slider-book-0",
+      });
+      expect(slides[1].imageUrl).toContain("/book.webp");
+      await saveSlide(
+        db,
+        admin,
+        {
+          ...slide,
+          id: slides[0].id,
+          title: "Düzenlenmiş sayfa",
+          published: true,
+          position: 9,
+        },
+        null,
+      );
+      await client.exec(sql);
+      expect(await db.homeSlide.count()).toBe(6);
+      expect((await getHomeSlides()).at(-1)?.title).toBe("Düzenlenmiş sayfa");
+      for (const item of slides)
+        await deleteSiteContent(db, admin, "slide", item.id);
+      expect(await getHomeSlides()).toEqual([]);
+    } finally {
+      await db.book.deleteMany({
+        where: { id: { startsWith: "slider-book-" } },
+      });
+    }
+  });
+
   it("duyuruları taslakta tutar, yayınlar, sıralar ve yayından kaldırır", async () => {
     const id = await saveAnnouncement(db, admin, announcement);
     expect(await getAnnouncements()).toEqual([]);

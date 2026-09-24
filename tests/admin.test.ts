@@ -51,6 +51,7 @@ const admin = {
   role: "admin",
   emailVerified: true,
   avatarUrl: null,
+  coinBalance: 0,
 };
 const secondAdmin = {
   ...admin,
@@ -81,7 +82,7 @@ const bookEdit = {
   reason,
   title: "Yönetilen Kitap",
   description: "Yönetici tarafından incelenen fantastik bir yolculuk hikâyesi.",
-  genre: "Fantastik" as const,
+  genres: ["Fantastik"] as ["Fantastik"],
   storyStatus: "ONGOING" as const,
   hidden: false,
   featured: false,
@@ -99,7 +100,7 @@ beforeAll(async () => {
       title: bookEdit.title,
       slug: "yonetilen-kitap",
       description: bookEdit.description,
-      genre: "Fantastik",
+      genres: ["Fantastik"],
       status: "PUBLISHED",
     },
   });
@@ -281,14 +282,19 @@ describe("Yönetim işlemlerinin yetki ve kayıt sınırları", () => {
     await updateBook(db, admin, {
       ...bookEdit,
       title: "Yeni Kitap Başlığı",
+      genres: ["Gizem", "Fantastik", "Gizem"],
       featured: true,
     });
     expect(await db.book.findUnique({ where: { id: "book" } })).toMatchObject({
       title: "Yeni Kitap Başlığı",
+      genres: ["Fantastik", "Gizem"],
       featured: true,
       status: "PUBLISHED",
       premiumStatus: "NONE",
     });
+    await expect(
+      updateBook(db, admin, { ...bookEdit, genres: [] }),
+    ).rejects.toThrow();
     await expect(
       updateBook(db, admin, { ...bookEdit, hidden: true, featured: true }),
     ).rejects.toMatchObject({ code: "NOT_PUBLIC" });

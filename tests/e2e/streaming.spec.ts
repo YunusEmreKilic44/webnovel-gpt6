@@ -97,7 +97,7 @@ test("arama tam sayfa yenilemeden sonuçlara geçer", async ({ page }) => {
     document.documentElement.dataset.navigationProbe = "retained";
   });
   await page
-    .getByRole("textbox", { name: "Kitap veya yazar adı", exact: true })
+    .getByRole("textbox", { name: "Kitap, yazar veya etiket ara", exact: true })
     .fill("Kül");
   await page.getByRole("button", { name: "Ara", exact: true }).click();
   await expect(page).toHaveURL(/q=/);

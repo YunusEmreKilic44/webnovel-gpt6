@@ -38,7 +38,7 @@ async function ChapterDetail({ params }: Props) {
           {chapter.hidden ? "Gizli" : "Gizlenmemiş"}
         </span>
         <span className="label-pill gray">
-          {chapter.accessType === "PAID" ? "Ücretli" : "Ücretsiz"}
+          {chapter.accessType === "PAID" ? "Premium" : "Ücretsiz"}
         </span>
         <span className="muted">
           {chapter._count.reads.toLocaleString("tr-TR")} okunma

@@ -27,10 +27,10 @@ test("keşif, arama ve mobil okuma", async ({ page }) => {
     fullPage: true,
   });
   await page
-    .getByRole("textbox", { name: "Hikâye veya yazar ara" })
+    .getByRole("textbox", { name: "Hikâye, yazar veya etiket ara" })
     .fill("Gece Ekspresi");
   await page
-    .getByRole("textbox", { name: "Hikâye veya yazar ara" })
+    .getByRole("textbox", { name: "Hikâye, yazar veya etiket ara" })
     .press("Enter");
   await expect(page.locator(".book-card")).toHaveCount(1);
   await page.locator(".book-card").click();
@@ -125,6 +125,8 @@ test("kayıt, kütüphane, yorum, yayın ve premium onayı", async ({
   await page.goto("/kutuphanem");
   await expect(page.locator(".book-card")).toHaveCount(1);
   await page.goto("/studio/yeni");
+  await page.getByRole("checkbox", { name: "Fantastik", exact: true }).check();
+  await page.getByRole("checkbox", { name: "Macera", exact: true }).check();
   await page.getByLabel("Kitabın adı").fill(`Yolculuk ${suffix}`);
   await page
     .getByLabel("Arka kapak yazısı")
@@ -221,7 +223,7 @@ test("kayıt, kütüphane, yorum, yayın ve premium onayı", async ({
   await premium.getByRole("button", { name: "Onayla" }).click();
   await expect(premium.getByText(/Onaylandı/)).toBeVisible();
   await page.goto(firstChapterUrl);
-  await expect(page.getByLabel("Fiyat (₺)")).toBeDisabled();
+  await expect(page.getByLabel(/^Premium ·/)).toBeDisabled();
   await page.goto(bookUrl);
   await page.getByText("+ Bu cilde bölüm ekle", { exact: true }).click();
   await page
@@ -238,10 +240,11 @@ test("kayıt, kütüphane, yorum, yayın ve premium onayı", async ({
     );
   await expect(page.getByRole("status")).toContainText("Taslak kaydedildi.");
   await page.getByRole("button", { name: "Bölümü yayımla" }).click();
-  await expect(page.getByLabel("Fiyat (₺)")).toBeEnabled();
-  await page.getByLabel("Fiyat (₺)").fill("5");
-  await page.getByRole("button", { name: "Kaydet", exact: true }).click();
-  await expect(page.getByText("Bölüm fiyatı güncellendi.")).toBeVisible();
+  // Authors only choose premium; the coin price is fixed by the platform.
+  await expect(page.getByLabel(/^Premium ·/)).toBeEnabled();
+  await page.getByLabel(/^Premium ·/).check();
+  await page.getByRole("button", { name: "Erişimi kaydet" }).click();
+  await expect(page.getByText(/Bölüm premium yapıldı/)).toBeVisible();
   const readerUrl = await page
     .getByRole("link", { name: "Okuyucu görünümü" })
     .getAttribute("href");

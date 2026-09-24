@@ -4,9 +4,8 @@ import {
   BookGridSkeleton,
   HeroSkeleton,
 } from "@/components/loading-skeletons";
-import Image from "next/image";
 import Link from "next/link";
-import { getCatalog, getFeaturedChapterId } from "@/modules/catalog/queries";
+import { getCatalog } from "@/modules/catalog/queries";
 import { BookCard } from "@/components/book-card";
 import { BookCover } from "@/components/book-cover";
 import {
@@ -17,23 +16,13 @@ import {
   Star,
   TrendingUp,
 } from "@/components/icons";
-import {
-  Sword,
-  Rocket,
-  Heart,
-  ScanEye,
-  Mountain,
-  Drama,
-  Sparkles,
-} from "lucide-react";
-import { genres, date } from "@/lib/utils";
+import { date } from "@/lib/utils";
 import { HomeSlider } from "@/components/home-slider";
 import {
   getAnnouncements,
   getHomeSlides,
 } from "@/modules/site-content/queries";
 
-const genreIcons = [Sparkles, Sword, Rocket, Heart, ScanEye, Mountain, Drama];
 const getHomeCatalog = cache(() => getCatalog({ limit: 6 }));
 
 export const revalidate = 60;
@@ -48,25 +37,6 @@ export default function Home() {
         <Suspense fallback={null}>
           <HomeAnnouncements />
         </Suspense>
-        <nav className="genre-tabs" aria-label="Hikâye türleri">
-          {genres.map((genre, index) => {
-            const Icon = genreIcons[index];
-            return (
-              <Link
-                key={genre}
-                href={
-                  index
-                    ? `/kesfet?genre=${encodeURIComponent(genre)}`
-                    : "/kesfet"
-                }
-                className={index ? "genre-tab" : "genre-tab selected"}
-              >
-                <Icon size={17} />
-                {index ? genre : "Tüm dünyalar"}
-              </Link>
-            );
-          })}
-        </nav>
         <section className="home-section">
           <div className="section-heading">
             <div>
@@ -139,95 +109,11 @@ export default function Home() {
 
 async function HomeHero() {
   const slides = await getHomeSlides();
-  if (slides.length)
-    return (
-      <HomeSlider
-        key={slides.map((slide) => slide.imageUrl).join(",")}
-        slides={slides}
-      />
-    );
-  // Both reads are independent, so the hero never waits on a second round trip
-  // to learn which chapter its primary button should open.
-  const [catalog, firstChapterId] = await Promise.all([
-    getHomeCatalog(),
-    getFeaturedChapterId(),
-  ]);
-  const featured = catalog[0];
   return (
-    <section className="home-hero" aria-label="Öne çıkan hikâye">
-      <Image
-        className="hero-image"
-        src={
-          featured?.cover && featured.cover !== "ember"
-            ? `/art/${featured.cover}.png`
-            : "/art/hero.png"
-        }
-        alt=""
-        fill
-        loading="eager"
-        fetchPriority="high"
-        quality={60}
-        sizes="100vw"
-      />
-      <div className="hero-shade" />
-      <div className="hero-inner">
-        <div className="hero-copy">
-          <span className="feature-tag">
-            <Flame size={15} fill="currentColor" /> HAFTANIN HİKÂYESİ
-          </span>
-          <div className="hero-genres">
-            <span>{featured?.genre ?? "Webnovel"}</span>
-            <span>ORİJİNAL SERİ</span>
-            <span>
-              {featured?.storyStatus === "COMPLETED"
-                ? "Tamamlandı"
-                : "Devam ediyor"}
-            </span>
-          </div>
-          <h1>{featured?.title ?? "Yeni dünyalar seni bekliyor."}</h1>
-          <p>
-            {featured?.description ??
-              "İlk hikâyeni yaz ve okuyucularla buluştur."}
-          </p>
-          {featured && (
-            <div className="hero-meta">
-              <span className="rating">
-                <Star size={15} fill="currentColor" />{" "}
-                {featured.averageRating > 0
-                  ? featured.averageRating.toLocaleString("tr-TR")
-                  : "Yeni"}
-              </span>
-              <span>{featured.chapterCount} bölüm</span>
-              <span>{featured.author}</span>
-            </div>
-          )}
-          <div className="hero-actions">
-            <Link
-              href={firstChapterId ? `/oku/${firstChapterId}` : "/studio/yeni"}
-              className="button button-dark"
-            >
-              <BookOpen size={17} />
-              {firstChapterId ? "Okumaya başla" : "Hikâyeni yaz"}
-              <ArrowRight size={17} />
-            </Link>
-            {featured && (
-              <Link
-                href={`/kitap/${featured.slug}`}
-                className="button button-glass"
-              >
-                Seriyi incele <ChevronRight size={17} />
-              </Link>
-            )}
-          </div>
-        </div>
-        <div className="hero-edition">
-          <span>SPOTLIGHT</span>
-          <strong>
-            01<span> / {String(catalog.length).padStart(2, "0")}</span>
-          </strong>
-        </div>
-      </div>
-    </section>
+    <HomeSlider
+      key={slides.map((slide) => slide.id).join(",")}
+      slides={slides}
+    />
   );
 }
 async function HomeAnnouncements() {
@@ -291,7 +177,7 @@ async function RecentBooks() {
           <div>
             <h3>{book.title}</h3>
             <p>
-              {book.genre} <span>·</span> {book.author}
+              {book.genres.join(" · ")} <span>·</span> {book.author}
             </p>
             <small>{date(book.updatedAt)}</small>
           </div>
@@ -325,7 +211,7 @@ async function RankedBooks() {
           />
           <div>
             <h3>{book.title}</h3>
-            <p>{book.genre}</p>
+            <p>{book.genres.join(" · ")}</p>
             <span className="rating">
               <Star size={12} fill="currentColor" />{" "}
               {book.averageRating > 0

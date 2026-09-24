@@ -2,10 +2,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
-import { Megaphone, Images } from "lucide-react";
+import { Megaphone, Images, ToggleRight } from "lucide-react";
 import {
   BookOpen,
   CheckCircle2,
+  Coins,
+  Flag,
   LayoutDashboard,
   List,
   MessageCircle,
@@ -20,11 +22,21 @@ const links = [
   { href: "/admin/kitaplar", label: "Kitaplar", icon: BookOpen },
   { href: "/admin/basvurular", label: "Başvurular", icon: CheckCircle2 },
   { href: "/admin/yorumlar", label: "Yorumlar", icon: MessageCircle },
+  { href: "/admin/raporlar", label: "Şikâyetler", icon: Flag },
   { href: "/admin/duyurular", label: "Duyurular", icon: Megaphone },
   { href: "/admin/slider", label: "Slider yönetimi", icon: Images },
+  { href: "/admin/coin", label: "Coin ve ödemeler", icon: Coins },
+  { href: "/admin/ozellikler", label: "Özellikler", icon: ToggleRight },
   { href: "/admin/islem-kaydi", label: "İşlem geçmişi", icon: List },
 ];
-export function AdminSidebar({ name }: { name: string }) {
+export function AdminSidebar({
+  name,
+  openReports = 0,
+}: {
+  name: string;
+  /** Unresolved reports, shown as a badge on the reports link. */
+  openReports?: number;
+}) {
   const pathname = usePathname();
   const nav = useRef<HTMLElement>(null);
   // On small screens the menu is a horizontal strip; keep the current page in view.
@@ -58,6 +70,14 @@ export function AdminSidebar({ name }: { name: string }) {
             >
               <Icon size={18} />
               {label}
+              {href === "/admin/raporlar" && openReports > 0 && (
+                <span
+                  className="admin-count"
+                  aria-label={`${openReports} açık şikâyet`}
+                >
+                  {openReports > 99 ? "99+" : openReports}
+                </span>
+              )}
             </Link>
           );
         })}

@@ -1,6 +1,7 @@
 import { PageSkeleton } from "@/components/loading-skeletons";
 import { getDb } from "@/db";
 import { CommentLikeButton } from "@/components/comment-like-button";
+import { ReportButton } from "@/components/report-button";
 import { cache, Suspense } from "react";
 import { BlockSkeleton, ButtonSkeleton } from "@/components/loading-skeletons";
 import type { CatalogBook } from "@/modules/catalog/queries";
@@ -51,9 +52,7 @@ async function BookDetail({ params }: Props) {
       <div className="breadcrumbs">
         <Link href="/">Keşfet</Link>
         <ChevronRight size={12} />
-        <Link href={`/kesfet?genre=${encodeURIComponent(book.genre)}`}>
-          {book.genre}
-        </Link>
+        <Link href="/kesfet">Kitaplar</Link>
         <ChevronRight size={12} />
         <span>{book.title}</span>
       </div>
@@ -70,7 +69,15 @@ async function BookDetail({ params }: Props) {
         />
         <div className="detail-heading">
           <div className="button-row">
-            <span className="label-pill">{book.genre}</span>
+            {book.genres.map((genre) => (
+              <Link
+                key={genre}
+                className="label-pill"
+                href={`/kesfet?genre=${encodeURIComponent(genre)}`}
+              >
+                {genre}
+              </Link>
+            ))}
             <span className="label-pill gray">
               {book.storyStatus === "COMPLETED"
                 ? "Tamamlandı"
@@ -86,7 +93,9 @@ async function BookDetail({ params }: Props) {
             )}
           </div>
           <h1>{book.title}</h1>
-          <p className="detail-author">{book.author}</p>
+          <p className="detail-author">
+            <Link href={`/yazar/${book.authorId}`}>{book.author}</Link>
+          </p>
           <div className="detail-rating">
             <Star size={15} fill="currentColor" />
             <strong>
@@ -97,6 +106,15 @@ async function BookDetail({ params }: Props) {
             <small>({book.ratingCount} değerlendirme)</small>
           </div>
           <p className="detail-description">{book.description}</p>
+          {book.tags.length > 0 && (
+            <nav className="book-tags" aria-label="Kitabın etiketleri">
+              {book.tags.map((tag) => (
+                <Link key={tag} href={`/kesfet?tag=${encodeURIComponent(tag)}`}>
+                  {tag}
+                </Link>
+              ))}
+            </nav>
+          )}
           <div className="detail-stats">
             <Suspense fallback={<span>Okunma yükleniyor…</span>}>
               <ReadCount bookId={book.id} />
@@ -120,6 +138,13 @@ async function BookDetail({ params }: Props) {
               <SaveBook bookId={book.id} />
             </Suspense>
           </div>
+          <Suspense fallback={null}>
+            <BookReport
+              bookId={book.id}
+              authorId={book.authorId}
+              author={book.author}
+            />
+          </Suspense>
         </div>
       </section>
       <div className="detail-tabs">
@@ -349,7 +374,9 @@ async function Comments({ bookId }: { bookId: string }) {
           />
           <div className="comment-body">
             <div className="comment-meta">
-              <strong>{comment.name}</strong>
+              <strong>
+                <Link href={`/yazar/${comment.userId}`}>{comment.name}</Link>
+              </strong>
               <time dateTime={comment.createdAt.toISOString()}>
                 {date(comment.createdAt)}
               </time>
@@ -374,6 +401,14 @@ async function Comments({ bookId }: { bookId: string }) {
                 bookId={bookId}
                 commentId={comment.id}
                 likeCount={comment._count.likes}
+              />
+            </Suspense>
+            <Suspense fallback={null}>
+              <CommentReport
+                bookId={bookId}
+                commentId={comment.id}
+                userId={comment.userId}
+                name={comment.name}
               />
             </Suspense>
           </div>
@@ -431,6 +466,45 @@ async function CommentLikeControl({
       commentId={commentId}
       likeCount={likeCount}
       liked={liked}
+    />
+  );
+}
+
+/** Report the book or its author; hidden from the author themselves. */
+async function BookReport(props: {
+  bookId: string;
+  authorId: string;
+  author: string;
+}) {
+  const actor = await getCurrentUser();
+  if (actor?.id === props.authorId) return null;
+  return (
+    <ReportButton
+      signedIn={Boolean(actor)}
+      className="book-report"
+      targets={[
+        { type: "BOOK", id: props.bookId, label: "Bu kitabı" },
+        { type: "USER", id: props.authorId, label: `Yazarı (${props.author})` },
+      ]}
+    />
+  );
+}
+async function CommentReport(props: {
+  bookId: string;
+  commentId: string;
+  userId: string;
+  name: string;
+}) {
+  const { actor } = await getCommentLikeViewer(props.bookId);
+  if (actor?.id === props.userId) return null;
+  return (
+    <ReportButton
+      signedIn={Boolean(actor)}
+      className="comment-report"
+      targets={[
+        { type: "COMMENT", id: props.commentId, label: "Bu yorumu" },
+        { type: "USER", id: props.userId, label: props.name },
+      ]}
     />
   );
 }

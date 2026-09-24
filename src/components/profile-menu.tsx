@@ -10,6 +10,8 @@ import {
   Settings2,
   ShieldCheck,
   UserRound,
+  Wallet,
+  Bell,
 } from "./icons";
 import { SignOut } from "./sign-out";
 import { useHydrated } from "@/lib/use-hydrated";
@@ -22,6 +24,9 @@ type MenuUser = {
   email: string;
   role: string;
   avatarUrl: string | null;
+  coinBalance: number;
+  unreadNotifications: number;
+  showWallet: boolean;
 };
 
 export function ProfileMenu({ user }: { user: MenuUser }) {
@@ -38,6 +43,22 @@ function AccountMenu({ user }: { user: MenuUser }) {
   const lastOnOpen = useRef(false);
   const links = [
     { href: "/profil", label: "Profilim", icon: UserRound },
+    {
+      href: "/bildirimler",
+      label: user.unreadNotifications
+        ? `Bildirimler · ${user.unreadNotifications} yeni`
+        : "Bildirimler",
+      icon: Bell,
+    },
+    ...(user.showWallet
+      ? [
+          {
+            href: "/cuzdan",
+            label: `Cüzdanım · ${user.coinBalance.toLocaleString("tr-TR")} coin`,
+            icon: Wallet,
+          },
+        ]
+      : []),
     { href: "/ayarlar", label: "Ayarlar", icon: Settings2 },
     { href: "/kutuphanem", label: "Kütüphanem", icon: Library },
     { href: "/studio", label: "Yazar stüdyosu", icon: Feather },

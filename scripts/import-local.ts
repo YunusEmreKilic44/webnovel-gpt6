@@ -12,6 +12,8 @@ const tables = [
   "session",
   "verification",
   "books",
+  "tags",
+  "book_tags",
   "volumes",
   "chapters",
   "chapter_revisions",
@@ -46,12 +48,28 @@ try {
   const records = await local.transaction(async (tx) => {
     const result = [];
     for (const table of tables) {
+      if (table === "tags" || table === "book_tags") {
+        const exists = await tx.query<{ present: boolean }>(
+          "SELECT to_regclass($1) IS NOT NULL AS present",
+          [table],
+        );
+        if (!exists.rows[0].present) {
+          result.push({ table, data: "[]", count: 0 });
+          continue;
+        }
+      }
       // PostgreSQL serializes timestamps directly, preserving microseconds.
       // Legacy user rows predate bans; provide defaults when importing that schema.
       const rowData =
         table === "user"
           ? "jsonb_build_object('banned', false, 'ban_reason', '', 'banned_at', NULL) || to_jsonb(t)"
-          : "to_jsonb(t)";
+          : table === "books"
+            ? `(to_jsonb(t) - 'genre') || jsonb_build_object('genres', COALESCE(
+                (SELECT jsonb_agg(g) FROM jsonb_array_elements(COALESCE(to_jsonb(t)->'genres', jsonb_build_array(to_jsonb(t)->>'genre'))) g WHERE g <> '"LGBT+"'::jsonb),
+                '["Diğer"]'::jsonb))`
+            : table === "applications"
+              ? "to_jsonb(t) || jsonb_build_object('snapshot', (CASE WHEN t.snapshot::jsonb ? 'genres' THEN t.snapshot::jsonb ELSE (t.snapshot::jsonb - 'genre') || jsonb_build_object('genres', jsonb_build_array(t.snapshot::jsonb->>'genre')) END) || jsonb_build_object('tags', COALESCE(t.snapshot::jsonb->'tags', '[]'::jsonb)))"
+              : "to_jsonb(t)";
       const { rows } = await tx.query<{ data: string; count: number }>(
         `SELECT COALESCE(json_agg(${rowData}), '[]')::text AS data, count(*)::int AS count FROM "${table}" t`,
       );

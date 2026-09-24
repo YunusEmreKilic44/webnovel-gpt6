@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { Shell } from "@/components/shell";
-import { ShellAccount, ShellAdminLink } from "@/components/shell-account";
+import {
+  ShellAccount,
+  ShellAdminLink,
+  ShellStoreLink,
+} from "@/components/shell-account";
 import { ButtonSkeleton } from "@/components/loading-skeletons";
 import "./globals.css";
 
@@ -26,6 +30,16 @@ export default function RootLayout({
           account={
             <Suspense fallback={<ButtonSkeleton label="Hesap yükleniyor" />}>
               <ShellAccount />
+            </Suspense>
+          }
+          storeLink={
+            <Suspense fallback={null}>
+              <ShellStoreLink />
+            </Suspense>
+          }
+          mobileStoreLink={
+            <Suspense fallback={null}>
+              <ShellStoreLink mobile />
             </Suspense>
           }
           mobileAdmin={

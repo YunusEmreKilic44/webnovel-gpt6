@@ -18,7 +18,6 @@ type ReaderProps = {
   position: number;
   volumeTitle: string;
   wordCount: number;
-  price: number;
   initialTheme: "paper" | "sepia" | "dark";
   initialFontSize: number;
 };

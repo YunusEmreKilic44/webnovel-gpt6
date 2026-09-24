@@ -10,6 +10,7 @@ import {
   requireVerified,
 } from "@/modules/publishing/policies";
 import type { ActionState } from "@/lib/action-state";
+import { canReadChapter } from "@/modules/coins/service";
 
 export async function interactAction(
   _: ActionState,
@@ -85,9 +86,18 @@ export async function interactAction(
       const chapterId = String(form.get("chapterId"));
       const chapter = await db.chapter.findFirst({
         where: { id: chapterId, bookId },
-        select: { status: true, hidden: true, accessType: true },
+        select: { id: true, status: true, hidden: true, accessType: true },
       });
-      if (!chapter || !canReadPublic(book, chapter))
+      const visible =
+        chapter && canReadPublic(book, { ...chapter, accessType: "FREE" });
+      if (
+        !chapter ||
+        !visible ||
+        !(await canReadChapter(db, actor.id, {
+          ...chapter,
+          authorId: book.authorId,
+        }))
+      )
         throw new DomainError("FORBIDDEN", "Bu bölüme erişimin yok.");
       await db.readingProgress.upsert({
         where: { userId_bookId },

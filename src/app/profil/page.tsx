@@ -66,6 +66,9 @@ async function Profile() {
               : "E-posta doğrulaması bekleniyor"}
           </span>
         </div>
+        <Link href={`/yazar/${user.id}`} className="button button-outline">
+          Herkese açık profilim
+        </Link>
         <Link href="/ayarlar" className="button button-outline">
           <Settings2 size={16} />
           Profili düzenle
@@ -124,7 +127,7 @@ async function MyStories({ userId }: { userId: string }) {
     where: { authorId: userId },
     orderBy: { updatedAt: "desc" },
     take: 6,
-    select: { id: true, title: true, genre: true, status: true },
+    select: { id: true, title: true, genres: true, status: true },
   });
   const statuses: Record<string, string> = {
     DRAFT: "Taslak",
@@ -144,7 +147,7 @@ async function MyStories({ userId }: { userId: string }) {
           <div>
             <h3>{book.title}</h3>
             <p>
-              {book.genre} · {statuses[book.status] ?? book.status}
+              {book.genres.join(" · ")} · {statuses[book.status] ?? book.status}
             </p>
           </div>
           <ArrowRight size={17} />

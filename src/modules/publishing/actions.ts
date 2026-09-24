@@ -57,7 +57,8 @@ export async function createBookAction(_: ActionState, form: FormData) {
     const input = service.bookInput.parse({
       title: value(form, "title"),
       description: value(form, "description"),
-      genre: value(form, "genre"),
+      genres: form.getAll("genres"),
+      tags: form.getAll("tags"),
       cover: value(form, "cover"),
     });
     const bookId = await service.createBook(
@@ -76,7 +77,8 @@ export async function updateBookDetailsAction(_: ActionState, form: FormData) {
       title: value(form, "title"),
       subtitle: value(form, "subtitle"),
       description: value(form, "description"),
-      genre: value(form, "genre"),
+      genres: form.getAll("genres"),
+      tags: form.getAll("tags"),
       storyStatus: value(form, "storyStatus"),
       cover: value(form, "cover"),
       removeCoverImage: form.get("removeCoverImage") === "on",
@@ -165,14 +167,20 @@ export async function publishChapterAction(_: ActionState, form: FormData) {
     return { message: "Bölüm yayımlandı." };
   });
 }
-export async function setChapterPriceAction(_: ActionState, form: FormData) {
+export async function setChapterAccessAction(_: ActionState, form: FormData) {
   return run(async (actor) => {
-    await service.setChapterPrice(
+    const premium =
+      z.enum(["PAID", "FREE"]).parse(form.get("access")) === "PAID";
+    await service.setChapterAccess(
       getDb(),
       actor,
       value(form, "chapterId"),
-      Math.round(Number(form.get("price")) * 100),
+      premium,
     );
-    return { message: "Bölüm fiyatı güncellendi." };
+    return {
+      message: premium
+        ? "Bölüm premium yapıldı. Okurlar sabit coin fiyatıyla açabilir."
+        : "Bölüm ücretsiz yapıldı.",
+    };
   });
 }

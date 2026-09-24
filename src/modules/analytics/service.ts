@@ -23,7 +23,11 @@ export async function recordChapterRead(
     SELECT c.id, ${viewerKey}, (now() AT TIME ZONE 'UTC')::date
     FROM chapters c JOIN books b ON b.id = c.book_id
     WHERE c.id = ${chapterId} AND c.status = 'PUBLISHED' AND NOT c.hidden
-      AND c.access_type = 'FREE' AND c.published_content IS NOT NULL
+      AND (c.access_type = 'FREE' OR EXISTS (
+        SELECT 1 FROM chapter_unlocks u
+        WHERE u.chapter_id = c.id AND u.user_id = ${userId}::text
+      ))
+      AND c.published_content IS NOT NULL
       AND c.published_content <> 'null'::jsonb
       AND b.status = 'PUBLISHED' AND NOT b.hidden
       AND (${userId}::text IS NULL OR b.author_id <> ${userId})

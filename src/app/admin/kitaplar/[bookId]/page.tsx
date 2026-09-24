@@ -22,7 +22,8 @@ import {
   updateBookAction,
   chapterVisibilityAction,
 } from "@/modules/admin/actions";
-import { genres } from "@/lib/utils";
+import { GenreField } from "@/components/genre-field";
+import { TagField } from "@/components/tag-field";
 import { BookCover } from "@/components/book-cover";
 
 export const metadata = { title: "Kitap ayrıntıları" };
@@ -94,7 +95,7 @@ async function BookDetail({ params, searchParams }: Props) {
         <ActionForm
           action={updateBookAction}
           className="form-stack"
-          key={`${book.title}:${book.genre}:${book.storyStatus}:${book.hidden}:${book.featured}:${book.description}:${book.coverUrl}`}
+          key={`${book.title}:${book.genres.join("|")}:${book.storyStatus}:${book.hidden}:${book.featured}:${book.description}:${book.coverUrl}`}
         >
           <input type="hidden" name="id" value={book.id} />
           <div className="admin-book-cover">
@@ -141,17 +142,9 @@ async function BookDetail({ params, searchParams }: Props) {
               rows={5}
             />
           </label>
+          <GenreField defaultValue={book.genres} />
+          <TagField key={book.tags.join("|")} defaultValue={book.tags} />
           <div className="admin-detail-grid">
-            <label className="field">
-              Tür
-              <select name="genre" defaultValue={book.genre}>
-                {genres
-                  .filter((genre) => genre !== "Tümü")
-                  .map((genre) => (
-                    <option key={genre}>{genre}</option>
-                  ))}
-              </select>
-            </label>
             <label className="field">
               Hikâye durumu
               <select name="storyStatus" defaultValue={book.storyStatus}>
@@ -218,7 +211,7 @@ async function BookDetail({ params, searchParams }: Props) {
                     {statusLabels[chapter.status]}
                     <small>
                       {chapter.hidden ? "Gizli" : "Gizlenmemiş"} ·{" "}
-                      {chapter.accessType === "PAID" ? "Ücretli" : "Ücretsiz"}
+                      {chapter.accessType === "PAID" ? "Premium" : "Ücretsiz"}
                     </small>
                   </td>
                   <td>{chapter._count.reads.toLocaleString("tr-TR")}</td>

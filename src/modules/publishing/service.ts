@@ -20,6 +20,19 @@ import {
 } from "@/lib/cloudinary";
 import { prepareImage } from "@/lib/image-upload";
 import { coverPresets } from "@/lib/covers";
+import {
+  notifyApplicationReviewed,
+  notifyNewChapter,
+} from "@/modules/notifications/service";
+import { getPremiumProgress } from "@/modules/premium/requirements";
+import { readFeatureFlags } from "@/modules/features/flags";
+import { bookGenres, MAX_BOOK_GENRES } from "@/lib/genres";
+import { bookTagsInput, tagKey } from "@/lib/tags";
+import {
+  bookTagSelection,
+  replaceBookTags,
+  tagNames,
+} from "@/modules/catalog/tags";
 
 export const bookInput = z.object({
   title: z
@@ -32,15 +45,17 @@ export const bookInput = z.object({
     .trim()
     .min(30, "Özet en az 30 karakter olmalı.")
     .max(3000),
-  genre: z.enum([
-    "Fantastik",
-    "Bilim Kurgu",
-    "Romantik",
-    "Gizem",
-    "Macera",
-    "Dram",
-  ]),
+  genres: z
+    .array(z.enum(bookGenres, { error: "Geçerli bir kategori seç." }))
+    .min(1, "En az bir kategori seç.")
+    .max(bookGenres.length, "Çok fazla kategori seçildi.")
+    .transform((values) => bookGenres.filter((genre) => values.includes(genre)))
+    .refine(
+      (values) => values.length <= MAX_BOOK_GENRES,
+      `Bir kitaba en fazla ${MAX_BOOK_GENRES} kategori ekleyebilirsin.`,
+    ),
   cover: z.enum(coverPresets),
+  tags: bookTagsInput,
 });
 const titleInput = z
   .string()
@@ -55,9 +70,12 @@ type Transaction = Prisma.TransactionClient;
 // All publishing mutations acquire the book lock first, including revision writes.
 async function lockBook(tx: Transaction, bookId: string) {
   await tx.$queryRaw`SELECT id FROM books WHERE id = ${bookId} FOR UPDATE`;
-  const book = await tx.book.findUnique({ where: { id: bookId } });
+  const book = await tx.book.findUnique({
+    where: { id: bookId },
+    include: { tags: bookTagSelection },
+  });
   if (!book) throw new DomainError("NOT_FOUND", "Kitap bulunamadı.");
-  return book;
+  return { ...book, tags: tagNames(book.tags) };
 }
 async function chapterBook(tx: Transaction, chapterId: string) {
   const reference = await tx.chapter.findUnique({
@@ -104,7 +122,7 @@ async function withCoverUpload<T>(
 export async function createBook(
   db: Database,
   actor: Actor,
-  input: z.infer<typeof bookInput>,
+  input: z.input<typeof bookInput>,
   coverImage?: File | null,
 ) {
   requireVerified(actor);
@@ -124,7 +142,7 @@ export const bookDetailsInput = bookInput.extend({
 });
 
 /**
- * The author edits their book: title, subtitle, description, genre, story
+ * The author edits their book: title, subtitle, description, genres, story
  * status and cover (preset, upload, replace or remove). The slug is kept so
  * shared links keep working.
  */
@@ -147,13 +165,23 @@ export async function updateBookDetails(
           ? { coverUrl: null, coverPublicId: null }
           : {};
       if ("coverUrl" in image) replacedPublicId = book.coverPublicId;
+      const { tags, ...details } = data;
       await tx.book.update({
         where: { id: book.id },
-        data: { ...data, ...image, updatedAt: new Date() },
+        data: { ...details, ...image, updatedAt: new Date() },
       });
+      await replaceBookTags(tx, book.id, tags);
       const changed: string[] = (
         Object.keys(data) as (keyof typeof data)[]
-      ).filter((key) => book[key] !== data[key]);
+      ).filter((key) =>
+        key === "genres"
+          ? book.genres.length !== data.genres.length ||
+            data.genres.some((genre) => !book.genres.includes(genre))
+          : key === "tags"
+            ? book.tags.length !== tags.length ||
+              tags.some((tag) => !book.tags.map(tagKey).includes(tagKey(tag)))
+            : book[key] !== data[key],
+      );
       if (uploaded) changed.push("coverImage");
       else if ("coverUrl" in image && book.coverUrl)
         changed.push("coverImageRemoved");
@@ -181,16 +209,18 @@ async function createBookRows(
   uploaded: StoredImage | null,
 ) {
   await db.$transaction(async (tx) => {
+    const { tags, ...details } = data;
     await tx.book.create({
       data: {
         id: bookId,
         authorId: actor.id,
-        ...data,
+        ...details,
         coverUrl: uploaded?.url,
         coverPublicId: uploaded?.publicId,
         slug: `${slugify(data.title)}-${bookId.slice(0, 8)}`,
       },
     });
+    await replaceBookTags(tx, bookId, tags);
     const volumeId = id();
     await tx.volume.create({
       data: { id: volumeId, bookId, title: "Birinci Cilt", position: 1 },
@@ -355,18 +385,34 @@ export async function submitApplication(
         "ALREADY_PENDING",
         "Bu türde bir başvurun zaten inceleniyor.",
       );
-    const samples = await tx.chapter.findMany({
-      where: { bookId },
-      orderBy: { createdAt: "asc" },
+    if (type === "PREMIUM") {
+      if (!(await readFeatureFlags(tx)).premiumApplications)
+        throw new DomainError(
+          "PREMIUM_CLOSED",
+          "Premium başvuruları şu an kapalı.",
+        );
+      const progress = await getPremiumProgress(tx, bookId);
+      if (!progress.eligible)
+        throw new DomainError(
+          "PREMIUM_REQUIREMENTS",
+          `Premium başvurusu için en az ${progress.minChapters} yayında bölüm ve ${progress.minReads.toLocaleString("tr-TR")} okunma gerekiyor. Şu an ${progress.chapters} bölüm ve ${progress.reads.toLocaleString("tr-TR")} okunma var.`,
+        );
+    }
+    // Reviewers always get the book's opening: the first chapter in reading
+    // order must be written, then up to two more written chapters follow it.
+    const chapters = await tx.chapter.findMany({
+      where: { bookId, hidden: false },
+      orderBy: [{ volume: { position: "asc" } }, { position: "asc" }],
     });
-    const complete = samples
-      .filter((c) => wordCount(c.content as JSONContent) >= 30)
-      .slice(0, 3);
-    if (!complete.length)
+    const [first] = chapters;
+    const written = (c: (typeof chapters)[number]) =>
+      wordCount(c.content as JSONContent) >= 30;
+    if (!first || !written(first))
       throw new DomainError(
-        "SAMPLE_REQUIRED",
-        "En az 30 kelimelik bir örnek bölüm kaydetmelisin.",
+        "FIRST_CHAPTER_REQUIRED",
+        `İlk bölümü (“${first?.title ?? "İlk Bölüm"}”) en az 30 kelimeyle yazıp kaydetmelisin; başvuruyla birlikte incelemeye gönderilir.`,
       );
+    const complete = [first, ...chapters.slice(1).filter(written)].slice(0, 3);
     await tx.application.create({
       data: {
         id: id(),
@@ -375,7 +421,8 @@ export async function submitApplication(
         snapshot: json({
           title: book.title,
           description: book.description,
-          genre: book.genre,
+          genres: book.genres,
+          tags: book.tags,
           chapters: complete.map((c) => ({
             id: c.id,
             title: c.title,
@@ -503,6 +550,7 @@ export async function reviewApplication(
         reviewedAt: new Date(),
       },
     });
+    await notifyApplicationReviewed(tx, application, book.authorId, decision);
     await tx.auditLog.create({
       data: {
         id: id(),
@@ -588,6 +636,13 @@ export async function publishChapter(
       where: { id: book.id },
       data: { status: "PUBLISHED", updatedAt: new Date() },
     });
+    // Only a chapter's first publication is news; republishing an edit is not.
+    if (!chapter.firstPublishedAt)
+      await notifyNewChapter(
+        tx,
+        { id: chapterId, bookId: book.id },
+        book.authorId,
+      );
     await tx.auditLog.create({
       data: {
         id: id(),
@@ -599,32 +654,38 @@ export async function publishChapter(
   });
 }
 
-export async function setChapterPrice(
+/**
+ * The author marks a chapter premium or free. Premium chapters are unlocked
+ * for the platform's fixed coin price; authors cannot set a price.
+ */
+export async function setChapterAccess(
   db: Database,
   actor: Actor,
   chapterId: string,
-  priceMinor: number,
+  premium: boolean,
 ) {
   requireVerified(actor);
-  z.number().int().min(0).max(100_000).parse(priceMinor);
+  z.boolean().parse(premium);
   await db.$transaction(async (tx) => {
     const book = await chapterBook(tx, chapterId);
     requireOwner(actor, book);
     const chapter = await tx.chapter.findUniqueOrThrow({
       where: { id: chapterId },
     });
-    if (priceMinor > 0) requirePaidEligibility(book, chapter);
+    if (premium) requirePaidEligibility(book, chapter);
+    const accessType = premium ? "PAID" : "FREE";
+    if (chapter.accessType === accessType) return;
     await tx.chapter.update({
       where: { id: chapterId },
-      data: { accessType: priceMinor > 0 ? "PAID" : "FREE", priceMinor },
+      data: { accessType, updatedAt: new Date() },
     });
     await tx.auditLog.create({
       data: {
         id: id(),
         actorId: actor.id,
         targetId: chapterId,
-        action: "chapter.price_changed",
-        detail: String(priceMinor),
+        action: "chapter.access_changed",
+        detail: accessType,
       },
     });
   });

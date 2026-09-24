@@ -13,15 +13,7 @@ export const date = (value: Date | string) =>
   new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "short" }).format(
     new Date(value),
   );
-export const genres = [
-  "Tümü",
-  "Fantastik",
-  "Bilim Kurgu",
-  "Romantik",
-  "Gizem",
-  "Macera",
-  "Dram",
-];
+export { genres } from "./genres";
 export function slugify(value: string) {
   return value
     .toLocaleLowerCase("tr-TR")

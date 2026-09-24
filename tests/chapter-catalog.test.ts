@@ -30,7 +30,7 @@ beforeAll(async () => {
         slug: id,
         title: id,
         description: "Bölüm listesi için kitap.",
-        genre: "Fantastik",
+        genres: ["Fantastik"],
         authorId: "author",
         status: id === "draft" ? "DRAFT" : "PUBLISHED",
         hidden: id === "hidden",
@@ -65,7 +65,6 @@ beforeAll(async () => {
           status: ordinal === 62 ? "DRAFT" : "PUBLISHED",
           hidden: ordinal === 61,
           accessType: ordinal === 60 ? "PAID" : "FREE",
-          priceMinor: ordinal === 60 ? 100 : 0,
         };
       }),
     });
@@ -93,7 +92,6 @@ describe("Okurlara açık bölüm listesi", () => {
     expect(second.at(-1)).toMatchObject({
       title: "Bölüm 60",
       accessType: "PAID",
-      priceMinor: 100,
       wordCount: 400,
     });
   });

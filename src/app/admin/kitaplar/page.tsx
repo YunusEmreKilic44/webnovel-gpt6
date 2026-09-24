@@ -75,7 +75,7 @@ async function Books({
                     {book.title}
                   </Link>
                   <small>
-                    {book.genre}
+                    {book.genres.join(" · ")}
                     {book.featured ? " · Vitrinde" : ""}
                   </small>
                 </th>

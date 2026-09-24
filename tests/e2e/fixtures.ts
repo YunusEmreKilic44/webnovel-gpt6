@@ -40,7 +40,7 @@ try {
         slug: "erisim-siniri",
         description:
           "Ücretli metnin HTML ve RSC yanıtına sızmadığını doğrulamak için ayrılmış test kitabı.",
-        genre: "Gizem",
+        genres: ["Gizem"],
         status: "PUBLISHED",
         premiumStatus: "ACTIVE",
         firstPremiumApprovedAt: new Date("2026-09-01T00:00:00Z"),
@@ -80,7 +80,6 @@ try {
         publishedContent: content,
         status: "PUBLISHED",
         accessType: "PAID",
-        priceMinor: 500,
         firstPublishedAt: new Date("2026-09-02T00:00:00Z"),
       },
       skipDuplicates: true,

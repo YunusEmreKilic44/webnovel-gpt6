@@ -4,6 +4,7 @@ import { unstable_cache } from "next/cache";
 import { getDb } from "@/db";
 import { Prisma } from "@/generated/prisma/client";
 import type { Book } from "@/db/schema";
+import { tagKey } from "@/lib/tags";
 
 // Every published-catalog read shares this tag, so a single revalidateTag call
 // after a publish, a rating or a comment refreshes all of them at once.
@@ -34,7 +35,7 @@ export type CatalogBook = Pick<
   | "title"
   | "subtitle"
   | "description"
-  | "genre"
+  | "genres"
   | "cover"
   | "coverUrl"
   | "status"
@@ -44,6 +45,7 @@ export type CatalogBook = Pick<
   | "featured"
   | "updatedAt"
 > & {
+  tags: string[];
   author: string;
   chapterCount: number;
   volumeCount: number;
@@ -65,7 +67,9 @@ const readBook = ({ updatedAt, ...book }: StoredBook): CatalogBook => ({
 });
 
 const catalogColumns = Prisma.sql`
-  b.id, b.slug, b.title, b.subtitle, b.description, b.genre, b.cover,
+  b.id, b.slug, b.title, b.subtitle, b.description, b.genres, b.cover,
+  ARRAY(SELECT t.name FROM book_tags bt JOIN tags t ON t.key = bt.tag_key
+        WHERE bt.book_id = b.id ORDER BY t.key) AS tags,
   b.cover_url AS "coverUrl", b.status,
   b.story_status AS "storyStatus", b.premium_status AS "premiumStatus",
   b.author_id AS "authorId", b.featured, b.updated_at AS "updatedAt", u.name AS author,
@@ -92,6 +96,7 @@ const catalogAggregates = Prisma.sql`
 type CatalogFilters = {
   q?: string;
   genre?: string;
+  tag?: string;
   completed?: boolean;
   sort?: string;
   limit?: number;
@@ -103,28 +108,70 @@ async function queryCatalog(filters: CatalogFilters): Promise<StoredBook[]> {
     ?.trim()
     .slice(0, 100)
     .replace(/[\\%_]/g, "\\$&");
+  const tagQuery = tagKey(filters.q?.trim().slice(0, 100) ?? "").replace(
+    /[\\%_]/g,
+    "\\$&",
+  );
+  const exactTag = filters.tag ? tagKey(filters.tag) : "";
   const rows = await getDb().$queryRaw<CatalogBook[]>(Prisma.sql`
     SELECT ${catalogColumns}
     FROM books b JOIN "user" u ON u.id = b.author_id ${catalogAggregates}
     WHERE b.status = 'PUBLISHED' AND NOT b.hidden
-    ${filters.genre && filters.genre !== "Tümü" ? Prisma.sql`AND b.genre = ${filters.genre}` : Prisma.empty}
-    ${query ? Prisma.sql`AND (b.title ILIKE ${"%" + query + "%"} OR u.name ILIKE ${"%" + query + "%"})` : Prisma.empty}
+    ${filters.genre && filters.genre !== "Tümü" ? Prisma.sql`AND b.genres @> ARRAY[${filters.genre}]::text[]` : Prisma.empty}
+    ${
+      query
+        ? Prisma.sql`AND (b.title ILIKE ${"%" + query + "%"} OR u.name ILIKE ${"%" + query + "%"}
+      ${tagQuery ? Prisma.sql`OR EXISTS (SELECT 1 FROM book_tags bt WHERE bt.book_id = b.id AND bt.tag_key LIKE ${"%" + tagQuery + "%"})` : Prisma.empty})`
+        : Prisma.empty
+    }
+    ${filters.tag ? Prisma.sql`AND EXISTS (SELECT 1 FROM book_tags bt WHERE bt.book_id = b.id AND bt.tag_key = ${exactTag})` : Prisma.empty}
     ${filters.completed ? Prisma.sql`AND b.story_status = 'COMPLETED'` : Prisma.empty}
     ORDER BY ${filters.sort === "rating" ? Prisma.sql`"averageRating" DESC,` : filters.sort === "recent" ? Prisma.empty : Prisma.sql`b.featured DESC,`}
     b.updated_at DESC, b.id LIMIT ${limit}
   `);
   return rows.map(storeBook);
 }
-const cachedCatalog = catalogCache("catalog-list", queryCatalog);
+const cachedCatalog = catalogCache("catalog-list-v3-tags", queryCatalog);
 
 export async function getCatalog(filters: CatalogFilters = {}) {
-  // Free-text search stays uncached: arbitrary terms would grow the key space
+  // Free-text and user-defined tag filters stay uncached: arbitrary terms grow the key space
   // without bound, and each term is typically requested once.
-  const rows = filters.q?.trim()
-    ? await queryCatalog(filters)
-    : await cachedCatalog(filters);
+  const rows =
+    filters.q?.trim() || filters.tag
+      ? await queryCatalog(filters)
+      : await cachedCatalog(filters);
   return rows.map(readBook);
 }
+
+// Published-book count per genre for the discovery filters.
+async function queryGenreCounts() {
+  const rows = await getDb().$queryRaw<{ genre: string; count: number }[]>`
+    WITH visible_books AS (
+      SELECT id, genres FROM books WHERE status = 'PUBLISHED' AND NOT hidden
+    )
+    SELECT genre, count(DISTINCT id)::int AS count
+    FROM visible_books CROSS JOIN LATERAL unnest(genres) AS genre
+    GROUP BY genre
+    UNION ALL
+    SELECT 'Tümü' AS genre, count(*)::int AS count FROM visible_books
+  `;
+  return Object.fromEntries(
+    rows.map((row) => [row.genre, row.count]),
+  ) as Record<string, number>;
+}
+export const getGenreCounts = catalogCache("genre-counts-v3", queryGenreCounts);
+
+/** Draft, hidden and orphaned tags never appear in public discovery. */
+async function queryPopularTags() {
+  return getDb().$queryRaw<{ name: string; key: string; count: number }[]>`
+    SELECT t.name, t.key, count(*)::int AS count
+    FROM tags t JOIN book_tags bt ON bt.tag_key = t.key
+    JOIN books b ON b.id = bt.book_id
+    WHERE b.status = 'PUBLISHED' AND NOT b.hidden
+    GROUP BY t.key, t.name ORDER BY count(*) DESC, t.key LIMIT 30
+  `;
+}
+export const getPopularTags = catalogCache("popular-tags", queryPopularTags);
 
 async function queryPublicBook(slug: string) {
   const rows = await getDb().$queryRaw<CatalogBook[]>(Prisma.sql`
@@ -134,7 +181,7 @@ async function queryPublicBook(slug: string) {
   `);
   return rows[0] ? storeBook(rows[0]) : null;
 }
-const cachedPublicBook = catalogCache("public-book", queryPublicBook);
+const cachedPublicBook = catalogCache("public-book-v3-tags", queryPublicBook);
 
 export const getPublicBook = cache(async (slug: string) => {
   const row = await cachedPublicBook(slug);
@@ -179,7 +226,6 @@ async function queryPublicChapters(bookId: string, take?: number, skip = 0) {
       position: true,
       volumeId: true,
       accessType: true,
-      priceMinor: true,
       publishedWordCount: true,
       firstPublishedAt: true,
       volume: { select: { title: true, position: true } },
@@ -198,7 +244,6 @@ async function queryPublicChapters(bookId: string, take?: number, skip = 0) {
     volumeTitle: c.volume.title,
     volumePosition: c.volume.position,
     accessType: c.accessType,
-    priceMinor: c.priceMinor,
     wordCount: c.publishedWordCount,
     publishedAt: c.firstPublishedAt?.getTime() ?? null,
   }));
@@ -226,7 +271,7 @@ export const getBookComments = cache(async (bookId: string) => {
       body: true,
       spoiler: true,
       createdAt: true,
-      user: { select: { name: true, avatarUrl: true } },
+      user: { select: { id: true, name: true, avatarUrl: true } },
       _count: { select: { likes: true } },
     },
     orderBy: { createdAt: "desc" },
@@ -234,6 +279,7 @@ export const getBookComments = cache(async (bookId: string) => {
   });
   return rows.map(({ user, ...comment }) => ({
     ...comment,
+    userId: user.id,
     name: user.name,
     avatarUrl: user.avatarUrl,
   }));
@@ -260,3 +306,48 @@ export async function getLibrary(userId: string) {
     ORDER BY l.created_at DESC
   `);
 }
+
+/**
+ * Public author page: the account (never banned ones) with its published,
+ * visible books and totals computed from what readers can see.
+ */
+export const getAuthorProfile = cache(async (userId: string) => {
+  const db = getDb();
+  const user = await db.user.findFirst({
+    where: { id: userId, banned: false },
+    select: { id: true, name: true, avatarUrl: true, createdAt: true },
+  });
+  if (!user) return null;
+  const [books, reads] = await Promise.all([
+    db.$queryRaw<CatalogBook[]>(Prisma.sql`
+      SELECT ${catalogColumns}
+      FROM books b JOIN "user" u ON u.id = b.author_id ${catalogAggregates}
+      WHERE b.author_id = ${userId} AND b.status = 'PUBLISHED' AND NOT b.hidden
+      ORDER BY b.updated_at DESC, b.id
+      LIMIT 60
+    `),
+    db.chapterRead.count({
+      where: {
+        chapter: {
+          status: "PUBLISHED",
+          hidden: false,
+          book: { authorId: userId, status: "PUBLISHED", hidden: false },
+        },
+      },
+    }),
+  ]);
+  const rated = books.filter((book) => book.ratingCount > 0);
+  return {
+    user,
+    books,
+    stats: {
+      books: books.length,
+      chapters: books.reduce((sum, book) => sum + book.chapterCount, 0),
+      reads,
+      rating: rated.length
+        ? rated.reduce((sum, book) => sum + book.averageRating, 0) /
+          rated.length
+        : 0,
+    },
+  };
+});

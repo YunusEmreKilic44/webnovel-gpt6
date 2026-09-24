@@ -56,7 +56,7 @@ const book = {
   title: "Kapaklı kitap",
   description:
     "Kapak yükleme akışını deneyen, yeterince uzun bir arka kapak yazısı.",
-  genre: "Fantastik" as const,
+  genres: ["Fantastik"] as ["Fantastik"],
   cover: "ocean" as const,
 };
 const details = (bookId: string) => ({
@@ -127,7 +127,7 @@ describe("Kitap kapağı yükleme", () => {
         subtitle: "Birinci kitap",
         description:
           "Tamamen yenilenmiş, okuru ilk satırdan yakalayan bir arka kapak yazısı.",
-        genre: "Gizem",
+        genres: ["Gizem"],
         storyStatus: "COMPLETED",
       },
       null,
@@ -135,7 +135,7 @@ describe("Kitap kapağı yükleme", () => {
     expect(await db.book.findUniqueOrThrow({ where: { id } })).toMatchObject({
       title: "Yeni ad",
       subtitle: "Birinci kitap",
-      genre: "Gizem",
+      genres: ["Gizem"],
       storyStatus: "COMPLETED",
       slug,
     });
@@ -221,7 +221,7 @@ describe("Kitap kapağı yükleme", () => {
       reason: "Uygunsuz kapak görseli",
       title: book.title,
       description: book.description,
-      genre: book.genre,
+      genres: book.genres,
       storyStatus: "ONGOING",
       hidden: false,
       featured: false,

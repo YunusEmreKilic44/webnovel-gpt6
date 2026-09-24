@@ -24,7 +24,7 @@ export async function StudioBooks() {
       title: true,
       cover: true,
       coverUrl: true,
-      genre: true,
+      genres: true,
       status: true,
       premiumStatus: true,
       _count: { select: { chapters: true } },
@@ -77,7 +77,7 @@ export async function StudioBooks() {
                   <span className="label-pill">{labels[book.status]}</span>
                   <h2>{book.title}</h2>
                   <p>
-                    {book.genre} · {count} bölüm
+                    {book.genres.join(" · ")} · {count} bölüm
                     {book.premiumStatus === "ACTIVE" ? " · Premium" : ""}
                   </p>
                 </div>

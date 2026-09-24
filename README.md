@@ -56,6 +56,21 @@ CLOUDINARY_FOLDER=satir  # yüklemeler satir/covers ve satir/slides altına gide
 - Migration’dan sonra eski, veritabanında saklanan slayt görsellerini taşımak için: `npm run media:migrate-slides -- --dry-run`, ardından `npm run media:migrate-slides`.
 - Yöneticiler kitap ayrıntı sayfasında yazarın yüklediği kapağı gerekçeyle kaldırabilir.
 
+### Coin ve ödemeler (iyzico)
+
+Okurlar cüzdan sayfasından (`/cuzdan`) coin paketi alır; premium bölümler **sabit bir coin fiyatıyla** açılır. Yazarlar fiyat belirlemez, yalnız premium onayından sonra yayımlanan bölümleri premium işaretler. Bölüm fiyatı ve paketler `/admin/coin` sayfasından yönetilir (varsayılan: bölüm 5 coin; 50 coin 24,99 ₺, 150 coin 64,99 ₺, 400 coin 159,99 ₺).
+
+```bash
+IYZICO_API_KEY=
+IYZICO_SECRET_KEY=
+IYZICO_BASE_URL=https://sandbox-api.iyzipay.com   # canlıda https://api.iyzipay.com
+```
+
+- Ödeme iyzico’nun barındırılan ödeme formunda alınır; kart bilgisi uygulamaya gelmez. iyzico sonucu `${BETTER_AUTH_URL}/api/payments/iyzico/callback` adresine gönderir, bu yüzden canlıda `BETTER_AUTH_URL` herkese açık https adresi olmalıdır.
+- Callback’e güvenilmez: sunucu token ile iyzico’dan sonucu sorgular; sipariş numarası, tutar, para birimi ve dolandırıcılık durumu eşleşmeden coin yüklenmez. Aynı ödeme iki kez yüklenemez.
+- Bakiye veritabanında eksiye düşemez; her hareket `coin_transactions` defterine yazılır. Bir bölüm aynı okur için yalnız bir kez ücretlendirilir.
+- Tahsil edilip siparişle uyuşmayan ödemeler `coins.order.paid_mismatch` olarak loglanır ve iyzico panelinden elle iade edilmelidir.
+
 ## Prisma geliştirme akışı
 
 `npm ci` ve `npm run build`, Prisma Client'ı otomatik üretir. Şema `prisma/schema.prisma` içinde, PostgreSQL bağlantısı `prisma.config.ts` ve `src/db/index.ts` içindedir. Üretilen istemci `src/generated/prisma/` altında tutulur ve Git'e eklenmez. `src/db/schema.ts` yalnız ortak TypeScript tiplerini içerir; ORM şeması değildir.

@@ -99,9 +99,14 @@ async function Applications({
                 </Link>
               </h2>
               <p>
-                {author} · {a.snapshot.genre}
+                {author} · {a.snapshot.genres.join(" · ")}
               </p>
               <p style={{ marginTop: 10 }}>{a.snapshot.description}</p>
+              {a.snapshot.tags.length > 0 && (
+                <p className="snapshot-tags">
+                  Etiketler: {a.snapshot.tags.join(" · ")}
+                </p>
+              )}
               {a.snapshot.chapters.map((chapter) => (
                 <details key={chapter.id}>
                   <summary>

@@ -5,7 +5,8 @@ export type Actor = Pick<User, "id" | "role" | "emailVerified" | "name">;
 export type ApplicationSnapshot = {
   title: string;
   description: string;
-  genre: string;
+  genres: string[];
+  tags: string[];
   chapters: {
     id: string;
     title: string;

@@ -25,7 +25,13 @@ type Common = {
   published: boolean;
   position: number;
 };
-function CommonFields({ item }: { item?: Common }) {
+function CommonFields({
+  item,
+  defaultPosition = 0,
+}: {
+  item?: Common;
+  defaultPosition?: number;
+}) {
   return (
     <>
       <input type="hidden" name="id" value={item?.id ?? ""} />
@@ -68,7 +74,7 @@ function CommonFields({ item }: { item?: Common }) {
             required
             min={0}
             max={9999}
-            defaultValue={item?.position ?? 0}
+            defaultValue={item?.position ?? defaultPosition}
           />
         </label>
         <label className="check-field">
@@ -107,7 +113,9 @@ export function AnnouncementForm({
 }
 export function SlideForm({
   item,
+  defaultPosition,
 }: {
+  defaultPosition?: number;
   item?: Common & {
     description: string;
     imageAlt: string;
@@ -118,7 +126,7 @@ export function SlideForm({
 }) {
   return (
     <ActionForm action={saveSlideAction} className="form-stack">
-      <CommonFields item={item} />
+      <CommonFields item={item} defaultPosition={defaultPosition} />
       <label className="field">
         Açıklama
         <textarea
@@ -159,7 +167,9 @@ export function DeleteContentForm({
 }) {
   return (
     <details className="content-delete">
-      <summary className="text-link">Kaydı sil</summary>
+      <summary className="text-link">
+        {kind === "slide" ? "Sayfayı sil" : "Kaydı sil"}
+      </summary>
       <p>
         Bu kayıt kalıcı olarak silinecek. Yalnızca gizlemek için “Ana sayfada
         yayımla” işaretini kaldırıp kaydet.

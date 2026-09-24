@@ -38,6 +38,7 @@ const author = {
   emailVerified: true,
   role: "reader",
   avatarUrl: null,
+  coinBalance: 0,
 };
 const content = {
   type: "doc",
@@ -63,7 +64,7 @@ beforeAll(async () => {
         title: "Kitap",
         slug: "kitap",
         description: "Açıklama",
-        genre: "Fantastik",
+        genres: ["Fantastik"],
         status: "PUBLISHED",
       },
       {
@@ -72,7 +73,7 @@ beforeAll(async () => {
         title: "Başka Kitap",
         slug: "baska",
         description: "Açıklama",
-        genre: "Fantastik",
+        genres: ["Fantastik"],
       },
     ],
   });
@@ -103,7 +104,6 @@ beforeAll(async () => {
           status: id === "draft" ? "DRAFT" : "PUBLISHED",
           hidden: id === "hidden",
           accessType: id === "paid" ? "PAID" : "FREE",
-          priceMinor: id === "paid" ? 100 : 0,
         }),
       ),
       {

@@ -2,6 +2,7 @@ import "server-only";
 import { getDb } from "@/db";
 import type { Prisma } from "@/generated/prisma/client";
 import { requireAdmin } from "./access";
+import { bookTagSelection, tagNames } from "@/modules/catalog/tags";
 
 export type SearchParams = Record<string, string | string[] | undefined>;
 export const PAGE_SIZE = 20;
@@ -148,7 +149,7 @@ export async function getAdminBooks(filters: Filters) {
         status: true,
         hidden: true,
         featured: true,
-        genre: true,
+        genres: true,
         author: { select: { id: true, name: true } },
         _count: { select: { chapters: true, comments: true } },
       },
@@ -169,7 +170,8 @@ export async function getAdminBook(id: string) {
         slug: true,
         title: true,
         description: true,
-        genre: true,
+        genres: true,
+        tags: bookTagSelection,
         cover: true,
         coverUrl: true,
         status: true,
@@ -190,7 +192,7 @@ export async function getAdminBook(id: string) {
       _count: true,
     }),
   ]);
-  return book ? { ...book, reads, rating } : null;
+  return book ? { ...book, tags: tagNames(book.tags), reads, rating } : null;
 }
 export async function getAdminChapters(bookId: string, filters: Filters) {
   await requireAdmin();

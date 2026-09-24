@@ -5,7 +5,8 @@ import { requireUser } from "@/lib/session";
 import { createBookAction } from "@/modules/publishing/actions";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { ArrowLeft, ArrowRight } from "@/components/icons";
-import { genres } from "@/lib/utils";
+import { GenreField } from "@/components/genre-field";
+import { TagField } from "@/components/tag-field";
 import { coverPresetOptions } from "@/lib/covers";
 import { CoverField } from "@/components/cover-field";
 async function NewBook() {
@@ -46,14 +47,8 @@ async function NewBook() {
             />
             <small>En az 30 karakter. Spoiler vermeden merak uyandır.</small>
           </label>
-          <label className="field">
-            Tür
-            <select name="genre" defaultValue="Fantastik">
-              {genres.slice(1).map((g) => (
-                <option key={g}>{g}</option>
-              ))}
-            </select>
-          </label>
+          <GenreField />
+          <TagField />
           <div className="field">
             Kapak
             <CoverField

@@ -8,7 +8,7 @@ const stories = [
     title: "Kül ve Yıldız",
     subtitle: "KAYIP KRALLIĞIN MİRASI",
     author: "Elif Arden",
-    genre: "Fantastik",
+    genres: ["Fantastik"],
     cover: "ember" as const,
     description:
       "Gökyüzünden son yıldız düştüğünde, herkes bunun bir son olduğunu sandı. Genç bir haritacı olan Lâl, avucunda sönmeyen bir kıvılcımla uyanır. Unutulmuş bir krallık, kırılmış bir yemin ve yeniden yazılmayı bekleyen bir kader. Bazen yolu bulmak için önce kaybolmak gerekir.",
@@ -34,7 +34,7 @@ const stories = [
     title: "Gece Ekspresi",
     subtitle: "BAZI YOLLAR EVE ÇIKMAZ",
     author: "Deniz Yalın",
-    genre: "Gizem",
+    genres: ["Gizem"],
     cover: "ocean" as const,
     description:
       "Her gece 00.17'de aynı istasyondan kalkan, hiçbir tarifede görünmeyen bir tren. Kayıp kardeşinin izini süren Ada, tek yön biletini aldığında geri dönüşün bir yer değil, bir seçim olduğunu öğrenecek.",
@@ -54,7 +54,7 @@ const stories = [
     title: "Yosun Kalbi",
     subtitle: "ORMAN SENİ HATIRLIYOR",
     author: "Mira Aksu",
-    genre: "Fantastik",
+    genres: ["Fantastik"],
     cover: "forest" as const,
     description:
       "İnsanların unuttuğu her şey bir ormanda büyür. Annesinin son hatırasını arayan bir kız, ağaçların isimlerini bilen bir yabancıyla karşılaşır. Doğanın ve hafızanın sınırlarında, sessizce filizlenen bir macera.",
@@ -74,7 +74,7 @@ const stories = [
     title: "Son Yörünge",
     subtitle: "SONSUZLUKTA BİR İHTİMAL",
     author: "Aras Tekin",
-    genre: "Bilim Kurgu",
+    genres: ["Bilim Kurgu"],
     cover: "violet" as const,
     description:
       "Dünya'dan gelen son sinyalin üzerinden kırk yıl geçti. Kepler istasyonunun yalnız arşivcisi, henüz doğmamış birinden bir mesaj alır. Zamanın iki ucunda başlayan bir insanlık hikâyesi.",
@@ -94,7 +94,7 @@ const stories = [
     title: "Eylülün Son Mektubu",
     subtitle: "SÖYLENMEMİŞ HER ŞEYE",
     author: "Selin Erdem",
-    genre: "Romantik",
+    genres: ["Romantik"],
     cover: "rose" as const,
     description:
       "Küçük bir sahafın rafları arasında bulunan on iki mektup. Hiç tanışmamış iki insanın birbirine bıraktığı notlar, sonbahar İstanbul'unda yollarını kesiştirir. Bazı hikâyeler noktadan sonra başlar.",
@@ -114,7 +114,7 @@ const stories = [
     title: "Kum Saati",
     subtitle: "HER SANİYE BİR SIR",
     author: "Bora Kuzey",
-    genre: "Macera",
+    genres: ["Macera"],
     cover: "sand" as const,
     description:
       "Çölün ortasında, haritalardan silinmiş bir şehir. Zamanın tersine aktığı söylentisini araştıran genç bir kâşif, kendi geçmişinin izleriyle karşılaşır. Keşfedilmeyi bekleyen yalnızca bir şehir değildir.",
@@ -142,6 +142,7 @@ try {
     console.log("Veritabanında kitap var; örnek veriler tekrar eklenmedi.");
   } else {
     await db.$transaction(async (tx) => {
+      const seedSlides = (await tx.homeSlide.count()) === 0;
       for (let n = 0; n < 8; n++)
         await tx.user.create({
           data: {
@@ -178,7 +179,7 @@ try {
             title: story.title,
             subtitle: story.subtitle,
             description: story.description,
-            genre: story.genre,
+            genres: story.genres,
             cover: story.cover,
             status: "PUBLISHED",
             storyStatus: storyIndex === 4 ? "COMPLETED" : "ONGOING",
@@ -236,6 +237,20 @@ try {
             },
           });
         }
+        if (seedSlides)
+          await tx.homeSlide.create({
+            data: {
+              id: `catalog-slide-${story.id}`,
+              title: story.title,
+              description: story.description,
+              linkPath:
+                storyIndex === 0 ? `/oku/${story.id}-1` : `/kitap/${story.id}`,
+              linkLabel: storyIndex === 0 ? "Okumaya başla" : "Seriyi incele",
+              imagePreset: story.cover === "ember" ? "hero" : story.cover,
+              published: true,
+              position: storyIndex + 1,
+            },
+          });
         for (let n = 0; n < 8; n++)
           await tx.rating.create({
             data: {

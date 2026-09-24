@@ -15,14 +15,16 @@ export const getReaderChapter = cache(async (chapterId: string) => {
       position: number;
       volumeTitle: string;
       wordCount: number;
-      price: number;
       accessType: string;
+      authorId: string;
+      premiumStatus: string;
     }[]
   >`
     SELECT c.id, c.published_title AS title, c.book_id AS "bookId",
       b.title AS "bookTitle", b.slug AS "bookSlug", u.name AS author,
       c.position, v.title AS "volumeTitle", c.published_word_count AS "wordCount",
-      c.price_minor AS price, c.access_type AS "accessType"
+      c.access_type AS "accessType", b.author_id AS "authorId",
+      b.premium_status AS "premiumStatus"
     FROM chapters c JOIN books b ON b.id = c.book_id
     JOIN volumes v ON v.id = c.volume_id JOIN "user" u ON u.id = b.author_id
     WHERE c.id = ${chapterId} AND c.status = 'PUBLISHED' AND NOT c.hidden

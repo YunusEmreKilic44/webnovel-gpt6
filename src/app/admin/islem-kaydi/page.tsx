@@ -109,6 +109,8 @@ function AuditDetail({ detail }: { detail: string }) {
     imageChanged: "Görsel değişti",
     description: "Açıklama",
     genre: "Tür",
+    genres: "Kategoriler",
+    tags: "Etiketler",
     storyStatus: "Hikâye durumu",
     hidden: "Gizli",
     featured: "Vitrinde",

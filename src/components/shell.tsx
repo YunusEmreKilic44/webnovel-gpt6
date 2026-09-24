@@ -6,16 +6,37 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { NavProgress } from "./nav-progress";
 import { useHydrated } from "@/lib/use-hydrated";
-import { BookOpen, Feather, Library, Menu, Search, X } from "./icons";
+import { BookOpen, Coins, Feather, Library, Menu, Search, X } from "./icons";
+
+/** Coin store link; the server only renders it while the store is open. */
+export function StoreNavLink({ mobile = false }: { mobile?: boolean }) {
+  const pathname = usePathname();
+  const active = pathname === "/cuzdan";
+  return (
+    <Link
+      href="/cuzdan"
+      className={cn("nav-link", active && "active")}
+      aria-current={active ? "page" : undefined}
+    >
+      {mobile && <Coins size={19} />}
+      Coin mağazası
+    </Link>
+  );
+}
 
 export function Shell({
   children,
   account,
+  storeLink,
+  mobileStoreLink,
   mobileAdmin,
   footerAdmin,
 }: {
   children: React.ReactNode;
   account: React.ReactNode;
+  /** Feature-switched links, streamed from the server. */
+  storeLink?: React.ReactNode;
+  mobileStoreLink?: React.ReactNode;
   mobileAdmin: React.ReactNode;
   footerAdmin: React.ReactNode;
 }) {
@@ -105,13 +126,14 @@ export function Shell({
                 {label}
               </Link>
             ))}
+            {storeLink}
           </nav>
           <Form action="/kesfet" className="search-box">
             <Search size={17} />
             <input
               name="q"
-              aria-label="Hikâye veya yazar ara"
-              placeholder="Hikâye veya yazar ara"
+              aria-label="Hikâye, yazar veya etiket ara"
+              placeholder="Hikâye, yazar veya etiket ara"
               maxLength={100}
             />
           </Form>
@@ -165,12 +187,14 @@ export function Shell({
                   key={href}
                   href={href}
                   className={cn("nav-link", active && "active")}
+                  aria-current={active ? "page" : undefined}
                   onClick={() => setOpen(false)}
                 >
                   <Icon size={19} />
                   {label}
                 </Link>
               ))}
+              <div onClick={() => setOpen(false)}>{mobileStoreLink}</div>
               <Link
                 href="/studio"
                 className="nav-link"

@@ -23,7 +23,7 @@ export function BookCard({ book }: { book: CatalogBook }) {
           )}
         </div>
       </div>
-      <div className="book-card-genre">{book.genre}</div>
+      <div className="book-card-genre">{book.genres.join(" · ")}</div>
       <h3>{book.title}</h3>
       <p>{book.author}</p>
       <div className="book-card-meta">

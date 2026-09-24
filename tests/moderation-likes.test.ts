@@ -46,7 +46,7 @@ beforeAll(async () => {
       slug: "test-kitabi",
       title: "Test Kitabı",
       description: "Yorum ve beğeni için kullanılan örnek bir kitap.",
-      genre: "Fantastik",
+      genres: ["Fantastik"],
       authorId: admin.id,
       status: "PUBLISHED",
     },

@@ -10,17 +10,17 @@ Bu doküman çalışan sürümü ve platformun hedef mimarisini birlikte tanıml
 
 ### Mevcut durum
 
-| Alan | 17 Eylül 2026 itibarıyla çalışan kapsam |
-| --- | --- |
-| Arayüz | Koyu zemin, kırmızı vurgu, anime seri vitrini, altı seçilebilir illüstrasyon, yatay gezinme ve mobil menü. |
-| Keşif ve okuma | Başlık/yazar araması, tür ve tamamlanma filtresi, puan sıralaması, kitap/cilt/bölüm ekranları, tema ve yazı boyutu tercihleri. |
-| Kimlik | Better Auth ve Prisma adaptörü; kayıt, giriş, çıkış, veritabanı oturumları, doğrulama ve şifre yenileme için Resend bağlantısı. |
-| Yazarlık | Kitap/cilt/bölüm oluşturma, Tiptap editörü, otomatik kayıt, sürüm çakışması kontrolü, taslak/canlı metin ayrımı. |
-| İnceleme | Yayın ve premium başvuru anlık görüntüleri, yönetici onay/red işlemleri ve denetim kayıtları. |
-| Topluluk | Kütüphane, bölüm bazlı okuma ilerlemesi, kitap puanı, kitap yorumu ve spoiler gizleme. |
-| Veritabanı | Prisma Client + Neon PostgreSQL + `@prisma/adapter-pg`; PGlite yalnız izole testler ve eski veri aktarımı için geliştirme bağımlılığıdır. |
-| Premium | Onay ve bölüm fiyatlandırması; eski ücretsiz bölümleri koruyan kurallar. Tahsilat ve satın alınmış erişim henüz yok. |
-| Doğrulama | 19 Eylül 2026: 29 Vitest testi, TypeScript, ESLint ve üretim derlemesi başarılı. Neon’da ayrı geçici veritabanıyla 5 Playwright testi geçti; kontrollü yavaş sorgularla Suspense sınırları da doğrulandı. Yerel veriler Neon’a aktarıldı ve alan değerleri doğrulandı. |
+| Alan           | 17 Eylül 2026 itibarıyla çalışan kapsam                                                                                                                                                                                                                                |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Arayüz         | Koyu zemin, kırmızı vurgu, anime seri vitrini, altı seçilebilir illüstrasyon, yatay gezinme ve mobil menü.                                                                                                                                                             |
+| Keşif ve okuma | Başlık/yazar araması, tür ve tamamlanma filtresi, puan sıralaması, kitap/cilt/bölüm ekranları, tema ve yazı boyutu tercihleri.                                                                                                                                         |
+| Kimlik         | Better Auth ve Prisma adaptörü; kayıt, giriş, çıkış, veritabanı oturumları, doğrulama ve şifre yenileme için Resend bağlantısı.                                                                                                                                        |
+| Yazarlık       | Kitap/cilt/bölüm oluşturma, Tiptap editörü, otomatik kayıt, sürüm çakışması kontrolü, taslak/canlı metin ayrımı.                                                                                                                                                       |
+| İnceleme       | Yayın ve premium başvuru anlık görüntüleri, yönetici onay/red işlemleri ve denetim kayıtları.                                                                                                                                                                          |
+| Topluluk       | Kütüphane, bölüm bazlı okuma ilerlemesi, kitap puanı, kitap yorumu ve spoiler gizleme.                                                                                                                                                                                 |
+| Veritabanı     | Prisma Client + Neon PostgreSQL + `@prisma/adapter-pg`; PGlite yalnız izole testler ve eski veri aktarımı için geliştirme bağımlılığıdır.                                                                                                                              |
+| Premium        | Onay ve bölüm fiyatlandırması; eski ücretsiz bölümleri koruyan kurallar. Tahsilat ve satın alınmış erişim henüz yok.                                                                                                                                                   |
+| Doğrulama      | 19 Eylül 2026: 29 Vitest testi, TypeScript, ESLint ve üretim derlemesi başarılı. Neon’da ayrı geçici veritabanıyla 5 Playwright testi geçti; kontrollü yavaş sorgularla Suspense sınırları da doğrulandı. Yerel veriler Neon’a aktarıldı ve alan değerleri doğrulandı. |
 
 Mevcut kullanıcı rolleri `reader` ve `admin` değerleridir; yazarlık kitap sahipliğiyle belirlenir. Aşağıdaki ayrıntılı rol, ödeme ve operasyon bölümleri ileride uygulanacak daha geniş modeli de içerir. Belirtilmeyen ürün davranışları **önerilen ürün kararı** olarak tasarlanmıştır.
 
@@ -32,18 +32,18 @@ Platformda kullanıcılar kitap yazar, kitaplarını ciltlere (volume) ve bölü
 
 Başlangıç için önerilen kararlar:
 
-| Konu | Karar |
-| --- | --- |
-| Pazar ve dil | İlk sürüm Türkçe; Türkiye ve TRY varsayımı. Ülke değişirse ödeme sağlayıcısı yeniden değerlendirilir. |
-| İçerik hiyerarşisi | Kitap → cilt → bölüm; her bölüm tam olarak bir cilde bağlıdır. |
-| Yazarlık | E-postasını doğrulayan kullanıcı yazar profili açabilir; kitap yayınlama onaya bağlıdır. |
-| Kitap sahipliği | İlk sürümde kitap başına tek yazar; ortak yazarlık ve sahiplik devri sonraki sürüme bırakılır. |
-| Yayın incelemesi | İlk kitap başvurusu incelenir; onaylı kitaba sonradan eklenen bölümler yazar tarafından yayımlanabilir. Şikâyet ve moderasyon devam eder. |
-| Premium | Kullanıcıya değil kitaba verilen ayrı bir ticari yetkidir. Okuyucu aboneliği anlamına gelmez. |
-| Satış modeli | Tek bölüm veya aynı kitaptan seçilmiş birden fazla bölümün tek ödemede satın alınması. |
-| Erişim | Satın alınan bölüme süre sınırı olmadan platform üzerinden erişim; gelecek bölümler pakete kendiliğinden dahil olmaz. |
-| İlk sürüm dışında | Coin/cüzdan, okuyucu aboneliği, bağış, otomatik bölüm satın alma ve farklı yazarlardan ortak sepet. |
-| Altyapı | Tek kod deposu, modüler monolit, ayrı web ve worker süreçleri, tek PostgreSQL veritabanı. |
+| Konu               | Karar                                                                                                                                                                                                                                                                                                                                                 |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pazar ve dil       | İlk sürüm Türkçe; Türkiye ve TRY varsayımı. Ülke değişirse ödeme sağlayıcısı yeniden değerlendirilir.                                                                                                                                                                                                                                                 |
+| İçerik hiyerarşisi | Kitap → cilt → bölüm; her bölüm tam olarak bir cilde bağlıdır.                                                                                                                                                                                                                                                                                        |
+| Yazarlık           | E-postasını doğrulayan kullanıcı yazar profili açabilir; kitap yayınlama onaya bağlıdır.                                                                                                                                                                                                                                                              |
+| Kitap sahipliği    | İlk sürümde kitap başına tek yazar; ortak yazarlık ve sahiplik devri sonraki sürüme bırakılır.                                                                                                                                                                                                                                                        |
+| Yayın incelemesi   | İlk kitap başvurusu incelenir; onaylı kitaba sonradan eklenen bölümler yazar tarafından yayımlanabilir. Şikâyet ve moderasyon devam eder.                                                                                                                                                                                                             |
+| Premium            | Kullanıcıya değil kitaba verilen ayrı bir ticari yetkidir. Okuyucu aboneliği anlamına gelmez.                                                                                                                                                                                                                                                         |
+| Satış modeli       | Coin ekonomisi: okur iyzico ile gerçek parayla coin paketi alır ve cüzdanına yükler. Premium bölümler platformun belirlediği **sabit coin fiyatıyla** (varsayılan 5 coin) tek tek açılır. Yazar fiyat belirlemez; yalnız bölümün premium olup olmadığını seçer. Fiyat ve paketleri yönetici değiştirir; değişiklik yalnız sonraki açılışları etkiler. |
+| Erişim             | Coin ile açılan bölüme süre sınırı olmadan erişim. Kitabın premium yetkisi askıya alınsa da açılmış bölümler okunur; yeni açılış yapılamaz.                                                                                                                                                                                                           |
+| İlk sürüm dışında  | Okuyucu aboneliği, bağış, otomatik bölüm açma, coin iadesi ve yazar gelir paylaşımı/ödemesi.                                                                                                                                                                                                                                                          |
+| Altyapı            | Tek kod deposu, modüler monolit, ayrı web ve worker süreçleri, tek PostgreSQL veritabanı.                                                                                                                                                                                                                                                             |
 
 Örnek kitap: **3 cilt, toplam 100 bölüm**. İlk cilt 1–30, ikinci cilt 31–65, üçüncü cilt 66–100. Bölüm sayıları sabit değildir; yazar cilt ve bölüm ekleyebilir. Okuyucuya gösterilen sayılar yalnızca görünür yayımlanmış içerikten hesaplanır; taslak sayıları yazar panelinde ayrıca gösterilir.
 
@@ -51,17 +51,17 @@ Başlangıç için önerilen kararlar:
 
 Roller bir kullanıcıda birleşebilir. İçerik sahipliği, rol kontrolüne ek olarak her işlemde doğrulanır.
 
-| İşlem | Ziyaretçi | Okuyucu | Kitabın yazarı | Moderatör | Yönetici / finans |
-| --- | --- | --- | --- | --- | --- |
-| Kitap keşfetme, ücretsiz bölüm okuma | Evet | Evet | Evet | Evet | Evet |
-| Kütüphane, puan, yorum | Hayır | Evet | Kendi kitabına puan veremez | Evet | Evet |
-| Bölüm satın alma | Hayır | Evet | Kendi kitabında gerekmez | Normal satın alma kuralları | Normal satın alma kuralları |
-| Taslak ve cilt düzenleme | Hayır | Hayır | Kendi kitabında | Hayır | Özel destek yetkisiyle |
-| Yayın / premium başvurusu | Hayır | Hayır | Kendi kitabında | Hayır | Yazar adına rutin başvuru yapmaz |
-| Yayın inceleme | Hayır | Hayır | Hayır | Atanmış başvurularda | Evet |
-| Premium kararı | Hayır | Hayır | Hayır | Hayır | `premium.review` yetkisiyle |
-| İçerik gizleme, şikâyet inceleme | Hayır | Hayır | Şikâyet edebilir | Evet | Evet |
-| İade ve gelir işlemleri | Hayır | Kendi talebi | Kendi raporu | Hayır | `finance.manage` yetkisiyle |
+| İşlem                                | Ziyaretçi | Okuyucu      | Kitabın yazarı              | Moderatör                   | Yönetici / finans                |
+| ------------------------------------ | --------- | ------------ | --------------------------- | --------------------------- | -------------------------------- |
+| Kitap keşfetme, ücretsiz bölüm okuma | Evet      | Evet         | Evet                        | Evet                        | Evet                             |
+| Kütüphane, puan, yorum               | Hayır     | Evet         | Kendi kitabına puan veremez | Evet                        | Evet                             |
+| Bölüm satın alma                     | Hayır     | Evet         | Kendi kitabında gerekmez    | Normal satın alma kuralları | Normal satın alma kuralları      |
+| Taslak ve cilt düzenleme             | Hayır     | Hayır        | Kendi kitabında             | Hayır                       | Özel destek yetkisiyle           |
+| Yayın / premium başvurusu            | Hayır     | Hayır        | Kendi kitabında             | Hayır                       | Yazar adına rutin başvuru yapmaz |
+| Yayın inceleme                       | Hayır     | Hayır        | Hayır                       | Atanmış başvurularda        | Evet                             |
+| Premium kararı                       | Hayır     | Hayır        | Hayır                       | Hayır                       | `premium.review` yetkisiyle      |
+| İçerik gizleme, şikâyet inceleme     | Hayır     | Hayır        | Şikâyet edebilir            | Evet                        | Evet                             |
+| İade ve gelir işlemleri              | Hayır     | Kendi talebi | Kendi raporu                | Hayır                       | `finance.manage` yetkisiyle      |
 
 Çalışan sürümde e-postası doğrulanmış yönetici, kendi kitabı dahil yayın ve premium başvurularını onaylayabilir veya reddedebilir. Karar gerekçesi, değerlendiren yönetici ve işlem kaydı saklanır; normal kullanıcılar değerlendirme yapamaz. Hedef moderatör rolü kendi kitabının başvurusunu değerlendiremez. Ücretli metne personel erişimi genel rol ayrıcalığı değildir; atanmış inceleme veya destek görevi gerektirir ve kaydedilir. Yönetici hesaplarında iki aşamalı doğrulama zorunludur.
 
@@ -152,7 +152,9 @@ Premium başvurusu yayın başvurusundan bağımsız kayıt ve inceleme sürecid
 
 Premium durumları: `NONE → ACTIVE → SUSPENDED | REVOKED`. Yeniden onayla `ACTIVE` durumuna dönülebilir; ilk onay tarihi korunur. Başvurunun bekleme/reddedilme bilgisi başvuru tablosunda tutulur, aktif bir yetkiyi yanlışlıkla ezmez.
 
-### 4.3. Bölümün ücretli yapılabilmesi
+### 4.3. Bölümün premium yapılabilmesi
+
+> **Güncel uygulama (coin ekonomisi):** Yazar yalnız `setChapterAccess(chapterId, premium)` ile bölümü premium/ücretsiz işaretler; aşağıdaki uygunluk kuralları (`requirePaidEligibility`) aynen uygulanır ama fiyat alanı yoktur. Premium bölümün fiyatı `coin_settings.chapter_price_coins` değeridir. Okur `unlockChapter` ile açar: `chapter_unlocks(user_id, chapter_id)` benzersizdir, bakiye `user.coin_balance >= 0` kısıtıyla tek koşullu `UPDATE` ile düşülür ve her hareket `coin_transactions` defterine yazılır. Coin yükleme `coin_orders` üzerinden iyzico Checkout Form ile yapılır; callback token'ı sunucudan iyzico'ya sorgulanarak doğrulanır ve sipariş `PENDING → PAID` karşılaştır-ve-değiştir ile yalnız bir kez yüklenir (`coin_transactions.order_id` benzersiz).
 
 Önerilen politika:
 
@@ -174,18 +176,18 @@ canSetPaid =
 
 Taslak bölüm için `requested_access_type` ve `requested_price_minor` tutulabilir. Bölüm ilk kez yayımlanırken uygunluk kontrol edilip yayın ile fiyatlandırma aynı transaction içinde tamamlanır. Zamanlanmış bölümde ücretli yayın koşulları sağlanmıyorsa iş başarısız olur ve yazara bildirilir; bölüm izinsiz biçimde ücretsiz yayımlanmaz.
 
-| Senaryo | Sonuç |
-| --- | --- |
-| Premium öncesi yayımlanmış bölüm | Daima ücretsiz kalır. |
-| Premium öncesi taslak oluşturulmuş, onaydan sonra ilk kez yayımlanmış bölüm | Ücretli olabilir. Taslak oluşturma tarihi belirleyici değildir. |
-| Premium öncesi yayımlanmış, sonra düzenlenmiş veya başka cilde taşınmış bölüm | Ücretli olamaz. |
-| Premium sonrası ilk kez ücretsiz yayımlanmış bölüm | Sonradan ücretli yapılabilir; bu politika yazar ve okuyucuya açıkça gösterilir. |
-| Premium sonrası ücretsiz okunmuş, daha sonra ücretli olmuş uygun bölüm | Önceki okuma kalıcı satın alma hakkı vermez. |
-| Premium başvurusu bekleyen veya reddedilen kitap | Ücretli yayın yapılamaz. |
-| Premium askıya alınmış kitap | Yeni ücretli yayın, yeni satış ve fiyat artırımı durur; satın alınmış erişimler korunur. |
-| Askı süresinde ilk kez ücretsiz yayımlanan bölüm | İlk onaydan sonraysa, yetki yeniden aktif olduğunda ücretli olabilir. |
-| Ücretli bölümün ücretsiz yapılması | Mevcut satın alma kaydı korunur; otomatik iade doğmaz. İade talepleri politika kapsamında incelenir. |
-| Kitap tekrar premium onayı alır | İlk onay tarihi sıfırlanmaz; eski ücretsiz bölümlerin uygunluğu değişmez. |
+| Senaryo                                                                       | Sonuç                                                                                                |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Premium öncesi yayımlanmış bölüm                                              | Daima ücretsiz kalır.                                                                                |
+| Premium öncesi taslak oluşturulmuş, onaydan sonra ilk kez yayımlanmış bölüm   | Ücretli olabilir. Taslak oluşturma tarihi belirleyici değildir.                                      |
+| Premium öncesi yayımlanmış, sonra düzenlenmiş veya başka cilde taşınmış bölüm | Ücretli olamaz.                                                                                      |
+| Premium sonrası ilk kez ücretsiz yayımlanmış bölüm                            | Sonradan ücretli yapılabilir; bu politika yazar ve okuyucuya açıkça gösterilir.                      |
+| Premium sonrası ücretsiz okunmuş, daha sonra ücretli olmuş uygun bölüm        | Önceki okuma kalıcı satın alma hakkı vermez.                                                         |
+| Premium başvurusu bekleyen veya reddedilen kitap                              | Ücretli yayın yapılamaz.                                                                             |
+| Premium askıya alınmış kitap                                                  | Yeni ücretli yayın, yeni satış ve fiyat artırımı durur; satın alınmış erişimler korunur.             |
+| Askı süresinde ilk kez ücretsiz yayımlanan bölüm                              | İlk onaydan sonraysa, yetki yeniden aktif olduğunda ücretli olabilir.                                |
+| Ücretli bölümün ücretsiz yapılması                                            | Mevcut satın alma kaydı korunur; otomatik iade doğmaz. İade talepleri politika kapsamında incelenir. |
+| Kitap tekrar premium onayı alır                                               | İlk onay tarihi sıfırlanmaz; eski ücretsiz bölümlerin uygunluğu değişmez.                            |
 
 Örnek: 100 bölümün ilk 60'ı premium onayından önce yayımlanmışsa 1–60 ücretsiz kalır. Onaydan sonra ilk kez yayımlanan 61–100, yazarın seçimine göre ücretsiz veya ücretli olabilir. Cilt sınırları bu kurala etki etmez.
 
@@ -206,24 +208,24 @@ Bölüm yayın durumu `DRAFT | SCHEDULED | PUBLISHED` olarak tutulur. Daha önce
 
 Sürüm politikası: Proje npm kullanır; bağımlılıklar `package-lock.json` ile sabitlenir ve `npm ci` ile kurulur. Çalışan sürüm Next.js 16, React 19, TypeScript ve Prisma 7 kullanır; Node.js 22.17+ gerekir. Kesin paket sürümleri için `package.json` ve kilit dosyası esas alınır. Aşağıdaki tablo çalışan teknolojileri ve ayrıca belirtilen hedef servisleri kapsar.
 
-| Katman | Seçim | Neden / sorumluluk |
-| --- | --- | --- |
-| Web ve sunucu | Next.js App Router + React + TypeScript, Node.js runtime | SEO, okuyucu ekranları, paneller ve sunucu işlemleri aynı uygulamada. |
-| Arayüz | Tailwind CSS altyapısı + global CSS + özel React bileşenleri + Lucide | Anime/manga görsel kimliği, paylaşılan formlar, okuyucu ve mobil gezinme. shadcn/ui kullanılmıyor. |
-| Doğrulama | Zod | Sunucuda komut ve form doğrulaması; istemci kontrolleri yalnızca kullanıcı deneyimi içindir. |
-| Kimlik | Better Auth + veritabanı oturumları | E-posta/parola, doğrulama, parola sıfırlama; ileride sosyal giriş. |
-| Veritabanı | PostgreSQL | İlişkiler, transaction, benzersizlik ve finans kayıtları. |
-| Veri erişimi | Prisma ORM + Prisma Migrate + `@prisma/adapter-pg` | Prisma şeması, tip güvenli istemci, kontrollü SQL migration'ları ve açık transaction sınırları. |
-| Editör | Tiptap'ın açık kaynak çekirdeği | Yapılandırılmış metin; ilk sürümde ortak canlı düzenleme gerekmez. |
-| İş kuyruğu | Hedef: pg-boss + ayrı Node.js worker | Zamanlanmış yayın, e-posta, mutabakat ve yeniden deneme; henüz uygulanmadı. |
-| Dosyalar | Mevcut: `public/art/`; hedef: Cloudflare R2 | Yerel anime illüstrasyonları mevcut; kapak/avatar yükleme henüz yok. Bölüm metni veritabanında kalır. |
-| E-posta | Mevcut: doğrudan Resend API; hedef: `EmailProvider` ve kuyruk | Hesap doğrulama ve şifre yenileme bağlantıları mevcut; kalıcı teslim kuyruğu henüz yok. |
-| Ödeme | Türkiye varsayımında iyzico Pazaryeri, `PaymentProvider` adaptörü arkasında | Tahsilat ve yazara gelir aktarımı için pazaryeri modeli. Ticari uygunluk ayrıca doğrulanır. |
-| Arama | Mevcut: parametreli `ILIKE`; hedef: `pg_trgm` indeksleri | Başlık/yazar araması, filtreler ve puan sıralaması; ayrı arama servisi yok. |
-| Test | Vitest + PGlite üzerinde Prisma entegrasyonu + Playwright | İş kuralları, migration, yarış koşulları ve tarayıcı akışları; ayrı PostgreSQL sunucusunda doğrulama sonraki dağıtım kontrolüdür. |
-| Çalıştırma | Docker, yönetilen container barındırma, yönetilen PostgreSQL | Web ve worker için ayrı süreç, ortak sürümlenmiş kod. |
-| CI | GitHub Actions | Tip/lint/test/build ve kontrollü migration/deploy. |
-| Gözlemleme | Yapılandırılmış JSON logları, OpenTelemetry, hata takip adaptörü | İstek/iş/ödeme kimliğiyle hata ve gecikme takibi. |
+| Katman        | Seçim                                                                       | Neden / sorumluluk                                                                                                                |
+| ------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Web ve sunucu | Next.js App Router + React + TypeScript, Node.js runtime                    | SEO, okuyucu ekranları, paneller ve sunucu işlemleri aynı uygulamada.                                                             |
+| Arayüz        | Tailwind CSS altyapısı + global CSS + özel React bileşenleri + Lucide       | Anime/manga görsel kimliği, paylaşılan formlar, okuyucu ve mobil gezinme. shadcn/ui kullanılmıyor.                                |
+| Doğrulama     | Zod                                                                         | Sunucuda komut ve form doğrulaması; istemci kontrolleri yalnızca kullanıcı deneyimi içindir.                                      |
+| Kimlik        | Better Auth + veritabanı oturumları                                         | E-posta/parola, doğrulama, parola sıfırlama; ileride sosyal giriş.                                                                |
+| Veritabanı    | PostgreSQL                                                                  | İlişkiler, transaction, benzersizlik ve finans kayıtları.                                                                         |
+| Veri erişimi  | Prisma ORM + Prisma Migrate + `@prisma/adapter-pg`                          | Prisma şeması, tip güvenli istemci, kontrollü SQL migration'ları ve açık transaction sınırları.                                   |
+| Editör        | Tiptap'ın açık kaynak çekirdeği                                             | Yapılandırılmış metin; ilk sürümde ortak canlı düzenleme gerekmez.                                                                |
+| İş kuyruğu    | Hedef: pg-boss + ayrı Node.js worker                                        | Zamanlanmış yayın, e-posta, mutabakat ve yeniden deneme; henüz uygulanmadı.                                                       |
+| Dosyalar      | Mevcut: `public/art/`; hedef: Cloudflare R2                                 | Yerel anime illüstrasyonları mevcut; kapak/avatar yükleme henüz yok. Bölüm metni veritabanında kalır.                             |
+| E-posta       | Mevcut: doğrudan Resend API; hedef: `EmailProvider` ve kuyruk               | Hesap doğrulama ve şifre yenileme bağlantıları mevcut; kalıcı teslim kuyruğu henüz yok.                                           |
+| Ödeme         | Türkiye varsayımında iyzico Pazaryeri, `PaymentProvider` adaptörü arkasında | Tahsilat ve yazara gelir aktarımı için pazaryeri modeli. Ticari uygunluk ayrıca doğrulanır.                                       |
+| Arama         | Mevcut: parametreli `ILIKE`; hedef: `pg_trgm` indeksleri                    | Başlık/yazar araması, filtreler ve puan sıralaması; ayrı arama servisi yok.                                                       |
+| Test          | Vitest + PGlite üzerinde Prisma entegrasyonu + Playwright                   | İş kuralları, migration, yarış koşulları ve tarayıcı akışları; ayrı PostgreSQL sunucusunda doğrulama sonraki dağıtım kontrolüdür. |
+| Çalıştırma    | Docker, yönetilen container barındırma, yönetilen PostgreSQL                | Web ve worker için ayrı süreç, ortak sürümlenmiş kod.                                                                             |
+| CI            | GitHub Actions                                                              | Tip/lint/test/build ve kontrollü migration/deploy.                                                                                |
+| Gözlemleme    | Yapılandırılmış JSON logları, OpenTelemetry, hata takip adaptörü            | İstek/iş/ödeme kimliğiyle hata ve gecikme takibi.                                                                                 |
 
 Better Auth'ın Next.js ve Prisma entegrasyonları vardır; kimlik ve oturum yönetimi kütüphaneye, kitap sahipliği ve premium kuralları uygulamanın servislerine aittir. Kaynaklar: [Next.js entegrasyonu](https://better-auth.com/docs/integrations/next), [Prisma adaptörü](https://better-auth.com/docs/adapters/prisma).
 
@@ -241,13 +243,13 @@ Tiptap içeriği JSON olarak saklanır; yalnız izinli düğüm ve işaretler re
 - Better Auth `prismaAdapter(..., { provider: "postgresql" })` kullanır. Oturum, katalog, topluluk, yayın, seed ve yönetici komutları Prisma'ya taşınmıştır. Drizzle paketleri ve eski şema/config dosyaları kaldırılmıştır.
 - Katalog istatistikleri, satır kilitleri ve atomik hız sınırı gibi SQL gerektiren işlemler Prisma'nın parametreli SQL API'sini kullanır; kullanıcı girdisi SQL metnine birleştirilmez.
 
-| Komut | İşlev |
-| --- | --- |
-| `npm run db:generate` | Şemadan Prisma Client üretir; migration oluşturmaz. |
+| Komut                                     | İşlev                                                                                       |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `npm run db:generate`                     | Şemadan Prisma Client üretir; migration oluşturmaz.                                         |
 | `npm run db:dev -- --name degisiklik_adi` | PostgreSQL geliştirme veritabanında Prisma Migrate ile yeni migration oluşturur ve uygular. |
-| `npm run db:migrate` | Kontrol edilmiş SQL migration'larını `prisma migrate deploy` ile Neon’a uygular. |
-| `npm run db:seed` | Kitap bulunmayan veritabanına örnek içerik ekler. |
-| `npm run db:admin -- kayitli@adres.com` | Var olan, doğrulanmış kullanıcıya yönetici rolü verir. |
+| `npm run db:migrate`                      | Kontrol edilmiş SQL migration'larını `prisma migrate deploy` ile Neon’a uygular.            |
+| `npm run db:seed`                         | Kitap bulunmayan veritabanına örnek içerik ekler.                                           |
+| `npm run db:admin -- kayitli@adres.com`   | Var olan, doğrulanmış kullanıcıya yönetici rolü verir.                                      |
 
 PGlite yalnız izole testlerde kullanılır; [tests/support/migrate.ts](./tests/support/migrate.ts) aynı Prisma SQL migration’larını test veritabanlarına uygular. Playwright ayrı `TEST_DATABASE_URL` ile PostgreSQL kullanır. [scripts/import-local.ts](./scripts/import-local.ts), eski `.data/postgres` verilerini önce yedekler ve boş Neon veritabanına aktarır; normal uygulama bu klasörü açmaz.
 
@@ -279,18 +281,18 @@ flowchart TD
 
 Bağımlılık yönü: `app → application services → domain policies → repository/provider interfaces`. Prisma ve dış servis adaptörleri bu arayüzleri uygular. Domain kuralları Next.js, ödeme SDK'sı veya UI bileşenlerini import etmez. Modüller birbirinin tablolarına gelişigüzel yazmaz; ilgili uygulama servisini çağırır.
 
-| Modül | Sahip olduğu sorumluluk |
-| --- | --- |
-| `identity` | Oturum, kullanıcı profili, roller, hesap kısıtları |
-| `catalog` | Kitap/cilt/bölüm kimliği, metadata, tür/etiket, keşif |
-| `publishing` | Taslak, sürümler, yayın başvurusu, ilk yayın ve zamanlama |
-| `premium` | Premium başvurusu, onay geçmişi, ücretlendirme uygunluğu |
-| `community` | Puan, yorum, şikâyet referansları |
-| `library` | Takip, okuma listesi ve ilerleme |
-| `commerce` | Sipariş, ödeme, erişim hakkı, iade, gelir ve aktarım |
-| `moderation` | İnceleme görevleri, içerik gizleme, itiraz |
-| `notifications` | Uygulama içi bildirim, e-posta tercihi ve teslim işleri |
-| `audit` | Yetkili işlemlerin değiştirilemez denetim kaydı |
+| Modül           | Sahip olduğu sorumluluk                                   |
+| --------------- | --------------------------------------------------------- |
+| `identity`      | Oturum, kullanıcı profili, roller, hesap kısıtları        |
+| `catalog`       | Kitap/cilt/bölüm kimliği, metadata, tür/etiket, keşif     |
+| `publishing`    | Taslak, sürümler, yayın başvurusu, ilk yayın ve zamanlama |
+| `premium`       | Premium başvurusu, onay geçmişi, ücretlendirme uygunluğu  |
+| `community`     | Puan, yorum, şikâyet referansları                         |
+| `library`       | Takip, okuma listesi ve ilerleme                          |
+| `commerce`      | Sipariş, ödeme, erişim hakkı, iade, gelir ve aktarım      |
+| `moderation`    | İnceleme görevleri, içerik gizleme, itiraz                |
+| `notifications` | Uygulama içi bildirim, e-posta tercihi ve teslim işleri   |
+| `audit`         | Yetkili işlemlerin değiştirilemez denetim kaydı           |
 
 ### 6.2. Mevcut ve hedef dosya yapısı
 
@@ -382,6 +384,12 @@ Next.js'in cache davranışı kullanılan yapılandırmaya göre değişir; kuru
 
 Bu bölümün ER diyagramı ve geniş tablo listesi hedef veri modelini anlatır. Mevcut şema `User`, `Session`, `Account`, `Verification`, `Book`, `Volume`, `Chapter`, `ChapterRevision`, `Application`, `Rating`, `Comment`, `LibraryEntry`, `ReadingProgress`, `AuditLog` ve `RateLimit` modellerinden oluşur.
 
+Kitap kategorileri sabit `src/lib/genres.ts` listesinden seçilir ve `Book.genres` PostgreSQL `text[]` alanında tutulur. En az bir, en fazla beş kategori seçilir; yayın ve yönetim servisleri aynı şemayla doğrular, tekrarları temizler ve sabit sıraya koyar. `GenreField` oluşturma, yazar düzenleme ve yönetim formlarında ortak kullanılır; form verisi `getAll("genres")` ile okunur. Katalog üyelik filtresi GIN indeksli `@>` sorgusuyla çalışır. Kategori sayaçları her kategoriye ait kitapları, “Tümü” ise benzersiz kitap toplamını gösterir. Yayın başvurusu anlık görüntüleri de kategori listesini taşır. `20260927000000_book_genres` migration'ı mevcut tek kategori değerlerini ve eski başvuru anlık görüntülerini veri kaybetmeden dönüştürür. Aşağıdaki ayrı kategori ve bağlantı tabloları, kategoriler yönetim panelinden düzenlenebilir hale geldiğinde kullanılacak hedef tasarımdır.
+
+Etiketler kategorilerden bağımsızdır: yazarın belirlediği `Tag` kayıtları `BookTag` üzerinden kitaplarla çoktan çoğa bağlanır. `tags.key` normalleştirilmiş benzersiz kimlik, `tags.name` ilk kaydedilen okunabilir etikettir; `book_tags(book_id, tag_key)` bileşik birincil anahtarı aynı kitapta tekrarı engeller ve ters `(tag_key, book_id)` indeksi etiket filtresini destekler. `src/lib/tags.ts` istemci ve sunucunun ortak kurallarını taşır: alan isteğe bağlıdır; en fazla 10 etiket, etiket başına 2–32 karakter ve 3 kelime; cümle noktalaması, çok satırlı metin, HTML ve URL kabul edilmez. Parantezli ve virgülle ayrılmış girişler desteklenir. Harf büyüklüğü, Türkçe `i/ı/İ/I` ve aksan farklılıkları aynı anahtara indirgenir (`yeni dünya` / `yeni dunya`). Etiketler semantik olarak otomatik sınıflandırılmaz; kısa anahtar kelime kullanımı arayüz açıklaması ve biçim sınırlarıyla yönlendirilir.
+
+`TagField` yazar ve yönetici formlarında ortak kullanılır. `getAll("tags")`, henüz Ekle'ye basılmamış girişi de doğrulamaya dahil eder. `replaceBookTags` kitap kilidi altında, kitabın diğer değişiklikleriyle aynı transaction içinde çalışır; ortak etiketler anahtar sırasıyla `INSERT ... ON CONFLICT` kullanılarak oluşturulur. Başvuru anlık görüntüleri başvuru anındaki etiketleri saklar. `/kesfet?q=...` kitap/yazar adına ek olarak etiket anahtarlarında arar; `/kesfet?tag=...` tam etiket üyeliğini kategori, sıralama ve tamamlanma filtreleriyle birleştirir. `EXISTS` sorguları birden fazla eşleşmede kitapları çoğaltmaz. Popüler etiketler yalnız görünür ve yayındaki kitaplardan hesaplanır; taslak/gizli kitaplar ve ilişkisiz etiketler listelenmez. Yazma işlemleri ortak katalog önbellek etiketini geçersiz kılar. `20260928000000_book_tags`, etiket tablolarını oluşturur, eski başvurulara boş etiket listesi ekler ve LGBT+ kategorisini mevcut kitaplardan kaldırır; tek kategorisi kaldırılan kitaplar `Diğer` olarak korunur. Eski başvuruların kategori geçmişi değiştirilmez.
+
 Çalışan sürümde yayın ve premium başvuruları ayrı tablolar yerine `applications.type = PUBLICATION | PREMIUM` ile tutulur; başvuru durumları `PENDING | APPROVED | REJECTED` değerleridir. Bölümün `content` alanı taslağı, `publishedContent` ve `publishedTitle` alanları canlı sürümü taşır. Geçmiş sürümler `chapter_revisions`, başvuru örnekleri değişmez JSON anlık görüntüsü içinde saklanır. Bölüm durumları `DRAFT | PUBLISHED`, hikâye durumları `ONGOING | COMPLETED | HIATUS` değerleridir. Sipariş, erişim hakkı, finans ve bildirim tabloları henüz oluşturulmamıştır.
 
 ### 7.1. Temel ilişkiler
@@ -407,31 +415,31 @@ erDiagram
 
 Tüm iş tablolarında UUID kimlikleri, uygun foreign key'ler ve `timestamptz` zaman alanları kullanılır. Zamanlar UTC tutulur; kullanıcı arayüzünde saat dilimine dönüştürülür. Para, kayan noktalı sayı yerine kuruş gibi en küçük para biriminde tam sayı ve para birimi koduyla saklanır.
 
-| Tablo / grup | Ana alanlar ve amaç |
-| --- | --- |
-| `users`, auth tabloları | Better Auth uyumlu kullanıcı, session, account ve verification kayıtları; hesap durumu. |
-| `user_roles`, `author_profiles` | Çoklu roller, yazar görünen adı ve biyografisi; özel ödeme bilgisi ayrı tutulur. |
-| `books` | `author_id`, `slug`, başlık, özet, dil, kapak, yayın/moderasyon/yazım durumu, `premium_status`, `first_premium_approved_at`, `version`. |
-| `book_revisions` | İncelemeye giden kitap profilinin değişmez sürümü; `published_revision_id` ile canlı profil ayrımı. |
-| `genres`, `tags`, bağlantı tabloları | Yönetilen sınıflandırma ve çoktan çoğa kitap bağlantıları. |
-| `volumes` | `book_id`, başlık, açıklama, `position`; yayımlanmamış içeriklerden bağımsız liste sırası. |
-| `chapters` | `book_id`, `volume_id`, başlık, `position`, yayın/görünürlük/moderasyon/satış durumu, `scheduled_at`, `first_published_at`, `published_revision_id`, `access_type`, fiyat, istenen yayın fiyatı, `version`. |
-| `chapter_revisions` | `chapter_id`, sürüm numarası, editör JSON'u, türetilmiş düz metin, kelime sayısı, içerik hash'i, oluşturucu. |
-| `publication_applications` | Kitap, başvuru sahibi, inceleyen, durum, kitap sürümü ve örnek bölüm sürümleri, karar gerekçesi, zamanlar. |
-| `premium_applications`, `premium_events` | Başvuru/sözleşme sürümü, karar ve onay/askı/iptal/yeniden etkinleştirme geçmişi. |
-| `ratings` | `user_id`, `book_id`, `score`; tek aktif puan. |
-| `comments` | `user_id`, `book_id`, isteğe bağlı `chapter_id`, `parent_id`, metin, spoiler/düzenleme/moderasyon durumu. |
-| `library_entries`, `reading_progress` | Kullanıcı-kitap listesi ve son bölüm, sürüme bağlı konum, güncelleme zamanı. |
-| `orders`, `order_items` | Kullanıcı, kitap, toplam, para birimi, durum; kalemde bölüm, satın alma fiyatı, yazar ve ticari koşul anlık görüntüsü. |
-| `purchase_reservations` | Kullanıcı-bölüm için aktif checkout rezervasyonu, ödeme girişimi ve sona erme/uzlaştırma bilgisi. |
-| `payment_attempts`, `payment_events` | Sağlayıcı referansı, yerel idempotency anahtarı, ödeme durumu, doğrulanan olay ve işlenme bilgisi. |
-| `entitlements`, `entitlement_events` | Kullanıcı-bölüm erişimi, kaynak sipariş kalemi, aktif/geri alınmış durumu ve geçmişi. |
-| `refunds`, `refund_items` | İade isteği, sağlayıcı durumu, bölüm bazlı tutar ve neden. |
-| `ledger_transactions`, `ledger_entries` | Değişmez, dengeli muhasebe hareketleri; sağlayıcı alacağı, yazar borcu, platform geliri, kesinti ve ters kayıtlar. |
-| `author_payment_accounts`, `settlements` | Sağlayıcı alt üye referansı, doğrulama durumu ve sağlayıcıdan teyit edilen yazar aktarımı. |
-| `reports`, `moderation_actions`, `appeals` | Şikâyet, hedef, işlem, gerekçe, itiraz ve sorumlu. |
-| `notifications`, `notification_preferences` | Uygulama içi bildirim ve kanal tercihleri. |
-| `audit_logs`, `outbox_events` | Yetkili işlem izi; transaction ile birlikte yazılan, dış işlere aktarılacak olaylar. |
+| Tablo / grup                                | Ana alanlar ve amaç                                                                                                                                                                                         |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `users`, auth tabloları                     | Better Auth uyumlu kullanıcı, session, account ve verification kayıtları; hesap durumu.                                                                                                                     |
+| `user_roles`, `author_profiles`             | Çoklu roller, yazar görünen adı ve biyografisi; özel ödeme bilgisi ayrı tutulur.                                                                                                                            |
+| `books`                                     | `author_id`, `slug`, başlık, özet, dil, kapak, yayın/moderasyon/yazım durumu, `premium_status`, `first_premium_approved_at`, `version`.                                                                     |
+| `book_revisions`                            | İncelemeye giden kitap profilinin değişmez sürümü; `published_revision_id` ile canlı profil ayrımı.                                                                                                         |
+| `genres`, `tags`, bağlantı tabloları        | Yönetilen sınıflandırma ve çoktan çoğa kitap bağlantıları.                                                                                                                                                  |
+| `volumes`                                   | `book_id`, başlık, açıklama, `position`; yayımlanmamış içeriklerden bağımsız liste sırası.                                                                                                                  |
+| `chapters`                                  | `book_id`, `volume_id`, başlık, `position`, yayın/görünürlük/moderasyon/satış durumu, `scheduled_at`, `first_published_at`, `published_revision_id`, `access_type`, fiyat, istenen yayın fiyatı, `version`. |
+| `chapter_revisions`                         | `chapter_id`, sürüm numarası, editör JSON'u, türetilmiş düz metin, kelime sayısı, içerik hash'i, oluşturucu.                                                                                                |
+| `publication_applications`                  | Kitap, başvuru sahibi, inceleyen, durum, kitap sürümü ve örnek bölüm sürümleri, karar gerekçesi, zamanlar.                                                                                                  |
+| `premium_applications`, `premium_events`    | Başvuru/sözleşme sürümü, karar ve onay/askı/iptal/yeniden etkinleştirme geçmişi.                                                                                                                            |
+| `ratings`                                   | `user_id`, `book_id`, `score`; tek aktif puan.                                                                                                                                                              |
+| `comments`                                  | `user_id`, `book_id`, isteğe bağlı `chapter_id`, `parent_id`, metin, spoiler/düzenleme/moderasyon durumu.                                                                                                   |
+| `library_entries`, `reading_progress`       | Kullanıcı-kitap listesi ve son bölüm, sürüme bağlı konum, güncelleme zamanı.                                                                                                                                |
+| `orders`, `order_items`                     | Kullanıcı, kitap, toplam, para birimi, durum; kalemde bölüm, satın alma fiyatı, yazar ve ticari koşul anlık görüntüsü.                                                                                      |
+| `purchase_reservations`                     | Kullanıcı-bölüm için aktif checkout rezervasyonu, ödeme girişimi ve sona erme/uzlaştırma bilgisi.                                                                                                           |
+| `payment_attempts`, `payment_events`        | Sağlayıcı referansı, yerel idempotency anahtarı, ödeme durumu, doğrulanan olay ve işlenme bilgisi.                                                                                                          |
+| `entitlements`, `entitlement_events`        | Kullanıcı-bölüm erişimi, kaynak sipariş kalemi, aktif/geri alınmış durumu ve geçmişi.                                                                                                                       |
+| `refunds`, `refund_items`                   | İade isteği, sağlayıcı durumu, bölüm bazlı tutar ve neden.                                                                                                                                                  |
+| `ledger_transactions`, `ledger_entries`     | Değişmez, dengeli muhasebe hareketleri; sağlayıcı alacağı, yazar borcu, platform geliri, kesinti ve ters kayıtlar.                                                                                          |
+| `author_payment_accounts`, `settlements`    | Sağlayıcı alt üye referansı, doğrulama durumu ve sağlayıcıdan teyit edilen yazar aktarımı.                                                                                                                  |
+| `reports`, `moderation_actions`, `appeals`  | Şikâyet, hedef, işlem, gerekçe, itiraz ve sorumlu.                                                                                                                                                          |
+| `notifications`, `notification_preferences` | Uygulama içi bildirim ve kanal tercihleri.                                                                                                                                                                  |
+| `audit_logs`, `outbox_events`               | Yetkili işlem izi; transaction ile birlikte yazılan, dış işlere aktarılacak olaylar.                                                                                                                        |
 
 ### 7.3. Veritabanı kısıtları ve indeksler
 
@@ -529,35 +537,37 @@ Mevcut yollar: `/`, `/kesfet`, `/kitap/[slug]`, `/oku/[chapterId]`, `/giris`, `/
 
 Aşağıdaki tablo hedef yolları da içerir; ayrı tür/yazar profili, satın alma ve yönetim alt sayfaları henüz uygulanmamıştır.
 
-| Alan | Örnek yollar |
-| --- | --- |
-| Keşif | `/`, `/kesfet`, `/tur/[slug]`, `/yazar/[username]` |
-| Kitap | `/kitap/[slug]` |
-| Okuma | `/oku/[chapterId]` — sıra/cilt değişse de kalıcı bağlantı |
-| Hesap | `/giris`, `/kayit`, `/hesap`, `/kutuphanem`, `/satinalmalar` |
-| Yazar | `/studio`, `/studio/books/[bookId]`, `/studio/books/[bookId]/chapters/[chapterId]` |
-| Başvurular | `/studio/books/[bookId]/publication`, `/studio/books/[bookId]/premium` |
-| Yönetim | `/admin/applications`, `/admin/reports`, `/admin/payments`, `/admin/audit` |
+| Alan       | Örnek yollar                                                                       |
+| ---------- | ---------------------------------------------------------------------------------- |
+| Keşif      | `/`, `/kesfet`, `/tur/[slug]`, `/yazar/[username]`                                 |
+| Kitap      | `/kitap/[slug]`                                                                    |
+| Okuma      | `/oku/[chapterId]` — sıra/cilt değişse de kalıcı bağlantı                          |
+| Hesap      | `/giris`, `/kayit`, `/hesap`, `/kutuphanem`, `/satinalmalar`                       |
+| Yazar      | `/studio`, `/studio/books/[bookId]`, `/studio/books/[bookId]/chapters/[chapterId]` |
+| Başvurular | `/studio/books/[bookId]/publication`, `/studio/books/[bookId]/premium`             |
+| Yönetim    | `/admin/applications`, `/admin/reports`, `/admin/payments`, `/admin/audit`         |
 
 Kitap slug'ı değişirse eski bağlantılar yönlendirme tablosuyla korunur. URL'de tahmin edilemeyen kimlik kullanılması yetki kontrolünün yerine geçmez.
 
 ### 9.2. Servis sözleşmeleri
 
-Mevcut yayın servisleri `createBook`, `addVolume`, `addChapter`, `saveChapter`, `submitApplication`, `reviewApplication`, `publishChapter` ve `setChapterPrice` fonksiyonlarıdır. Kütüphane, puan, yorum ve ilerleme işlemleri `interactAction` ile yürür. Aşağıdaki komutlar genişletilmiş hedef sözleşmelerdir; ödeme ve zamanlama servisleri henüz yoktur.
+Mevcut yayın servisleri `createBook`, `updateBookDetails`, `addVolume`, `addChapter`, `saveChapter`, `submitApplication`, `reviewApplication`, `publishChapter` ve `setChapterAccess` fonksiyonlarıdır. Coin servisleri (`src/modules/coins`) `createCoinOrder`, `completeCoinOrder`, `unlockChapter`, `canReadChapter`, `updateCoinSettings` ve `saveCoinPackage` fonksiyonlarıdır. Kütüphane, puan, yorum ve ilerleme işlemleri `interactAction` ile yürür. Aşağıdaki komutlar genişletilmiş hedef sözleşmelerdir; ödeme ve zamanlama servisleri henüz yoktur.
 
-| Komut / sorgu | Kritik kontrol |
-| --- | --- |
-| `submitPublicationApplication(bookId)` | Sahiplik, doğrulama, örnek sürümler, açık başvuru bulunmaması |
-| `reviewPublicationApplication(applicationId, decision)` | İnceleme yetkisi, çıkar çatışması, başvuru sürümü, gerekçe |
-| `publishChapter(chapterId, revisionId, expectedVersion)` | Kitap onayı, sahiplik, sürüm ilişkisi, ilk yayın tarihi ve istenen ücret |
-| `scheduleChapter(chapterId, revisionId, at)` | Geçerli saat, sürüm; çalıştırma anında tüm yayın kuralları yeniden kontrol edilir |
-| `approvePremium(applicationId)` | Yönetici yetkisi, onboarding, ilk onay tarihinin korunması |
-| `setChapterPrice(chapterId, price, expectedVersion)` | Premium ve ilk yayın kuralı, fiyat aralığı, optimistic locking |
-| `getChapterForReader(chapterId)` | Görünürlük, oturum/erişim hakkı, güvenli DTO |
-| `rateBook(bookId, score)` | Doğrulanmış kullanıcı, 1–5, kendi kitabı olmaması |
-| `createCheckout(chapterIds, idempotencyKey)` | Sunucu fiyatı, tek kitap, hak/rezervasyon kontrolü |
-| `handlePaymentEvent(providerEvent)` | İmza, sunucu teyidi, tekrar anahtarı, atomik hak ve muhasebe |
-| `requestRefund(orderItemIds, reason)` | Sipariş sahipliği veya finans yetkisi, iade edilebilir kalemler |
+| Komut / sorgu                                            | Kritik kontrol                                                                    |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `submitPublicationApplication(bookId)`                   | Sahiplik, doğrulama, örnek sürümler, açık başvuru bulunmaması                     |
+| `reviewPublicationApplication(applicationId, decision)`  | İnceleme yetkisi, çıkar çatışması, başvuru sürümü, gerekçe                        |
+| `publishChapter(chapterId, revisionId, expectedVersion)` | Kitap onayı, sahiplik, sürüm ilişkisi, ilk yayın tarihi ve istenen ücret          |
+| `scheduleChapter(chapterId, revisionId, at)`             | Geçerli saat, sürüm; çalıştırma anında tüm yayın kuralları yeniden kontrol edilir |
+| `approvePremium(applicationId)`                          | Yönetici yetkisi, onboarding, ilk onay tarihinin korunması                        |
+| `setChapterAccess(chapterId, premium)`                   | Premium ve ilk yayın kuralı; fiyat yazardan alınmaz                               |
+| `unlockChapter(chapterId)`                               | Görünürlük, aktif premium, benzersiz açılış, yeterli bakiye, defter kaydı         |
+| `completeCoinOrder(token)`                               | iyzico sunucu teyidi, sipariş/tutar/para birimi eşleşmesi, tek seferlik yükleme   |
+| `getChapterForReader(chapterId)`                         | Görünürlük, oturum/erişim hakkı, güvenli DTO                                      |
+| `rateBook(bookId, score)`                                | Doğrulanmış kullanıcı, 1–5, kendi kitabı olmaması                                 |
+| `createCheckout(chapterIds, idempotencyKey)`             | Sunucu fiyatı, tek kitap, hak/rezervasyon kontrolü                                |
+| `handlePaymentEvent(providerEvent)`                      | İmza, sunucu teyidi, tekrar anahtarı, atomik hak ve muhasebe                      |
+| `requestRefund(orderItemIds, reason)`                    | Sipariş sahipliği veya finans yetkisi, iade edilebilir kalemler                   |
 
 Hatalar kararlı kodlarla döner: `FORBIDDEN`, `REVISION_CONFLICT`, `PREMIUM_NOT_ACTIVE`, `CHAPTER_PREDATES_PREMIUM`, `ALREADY_OWNED`, `PAYMENT_PENDING`. Arayüz teknik kod yerine anlaşılır Türkçe açıklama gösterir.
 
@@ -565,14 +575,14 @@ Hatalar kararlı kodlarla döner: `FORBIDDEN`, `REVISION_CONFLICT`, `PREMIUM_NOT
 
 Bir transaction içinde hem iş verisi hem `outbox_events` yazılır. Outbox aktarıcısı, olayları pg-boss'a taşır; gönderim ile işaretleme arasında çökme olduğunda aynı olay yeniden gönderilebilir. Tüketici, olay/iş kimliğine göre tekrar işlemeyi etkisiz hale getirir.
 
-| İş | Davranış |
-| --- | --- |
-| Zamanlanmış yayın | Kaydedilmiş plan sürümünü doğrular; iptal edilmiş/eski planı çalıştırmaz. Kitap ve premium kurallarını tekrar uygular. |
-| Yeni bölüm bildirimi | Yalnız ilk yayın olayı; aynı bölüm düzenlenince takipçilere tekrar tekrar gönderilmez. |
-| E-posta | Tekrar deneme ve sağlayıcı referansı; kalıcı hatalar yönetim kuyruğuna alınır. |
-| Ödeme mutabakatı | Belirsiz ödeme/iadeleri sorgular; doğrulanmış sonuç için ortak ödeme işleyicisini çağırır. |
-| İstatistik | Tekil olaylardan sayaç/özet üretir; gerektiğinde ham kayıtlardan yeniden kurulabilir. |
-| Dosya temizliği | Süresi dolmuş sahipsiz yüklemeleri kaldırır; canlı kapak ve satın alma verilerine dokunmaz. |
+| İş                   | Davranış                                                                                                               |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Zamanlanmış yayın    | Kaydedilmiş plan sürümünü doğrular; iptal edilmiş/eski planı çalıştırmaz. Kitap ve premium kurallarını tekrar uygular. |
+| Yeni bölüm bildirimi | Yalnız ilk yayın olayı; aynı bölüm düzenlenince takipçilere tekrar tekrar gönderilmez.                                 |
+| E-posta              | Tekrar deneme ve sağlayıcı referansı; kalıcı hatalar yönetim kuyruğuna alınır.                                         |
+| Ödeme mutabakatı     | Belirsiz ödeme/iadeleri sorgular; doğrulanmış sonuç için ortak ödeme işleyicisini çağırır.                             |
+| İstatistik           | Tekil olaylardan sayaç/özet üretir; gerektiğinde ham kayıtlardan yeniden kurulabilir.                                  |
+| Dosya temizliği      | Süresi dolmuş sahipsiz yüklemeleri kaldırır; canlı kapak ve satın alma verilerine dokunmaz.                            |
 
 Worker yeniden başladığında vadesi geçmiş işleri yakalar. En az bir kez işlenme olasılığı uygulama tasarımında kabul edilir; dış yan etkiler için genel bir “tam bir kez çalışır” varsayımı yapılmaz. Finans işlerinde sessizce vazgeçmek yerine alarm ve manuel inceleme kaydı üretilir.
 
@@ -633,17 +643,17 @@ Altyapı giderleri: web/worker işlem gücü, PostgreSQL ve yedekler, nesne depo
 
 17 Eylül 2026 tarihli son uygulama kontrolü:
 
-| Kontrol | Sonuç ve kapsam |
-| --- | --- |
-| `npm test` | 24 test başarılı: 21 yayın/içerik testi ve 3 migration testi. Otomatik yayın ve katalog görünürlüğü, incelenen sürümün korunması, gizli/eksik örnekte rollback, yöneticinin kendi kitabında karar verebilmesi, yetki sınırları ve işlem kayıtları kapsanır. Prisma Client ve geçici PGlite veritabanları kullanılır. |
-| `npm run test:e2e` | Üretim derlemesi ve 3 Playwright testi başarılı. Keşif/arama/mobil okuma; kayıt/kütüphane/yorum/yayın/premium; ücretli metnin HTML/RSC/liste yanıtlarından korunması. |
-| `npm run typecheck`, `npm run lint` | Başarılı. |
-| Prisma şeması | Doğrulama ve istemci üretimi başarılı. |
-| Migration geçişi | Mevcut yerel veriler korundu; tekrar çalıştırma, tanınmayan eski geçmiş ve checksum uyuşmazlığı test edildi. |
-| Tarih hassasiyeti | Mikrosaniyeli eski ilk yayın zamanı yeniden yayında aynen korunuyor. |
-| Görsel kontrol | Masaüstü ve mobilde ana sayfa, kitap detayları ve okuyucu incelendi; kapaklar yükleniyor, yatay taşma yok. |
-| Mobil erişilebilirlik | Menü odağı, Escape ile kapatma ve açma düğmesine odak dönüşü test edildi. |
-| Bağımlılıklar | Son `npm audit` kontrolünde 0 bilinen açık. |
+| Kontrol                             | Sonuç ve kapsam                                                                                                                                                                                                                                                                                                      |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm test`                          | 24 test başarılı: 21 yayın/içerik testi ve 3 migration testi. Otomatik yayın ve katalog görünürlüğü, incelenen sürümün korunması, gizli/eksik örnekte rollback, yöneticinin kendi kitabında karar verebilmesi, yetki sınırları ve işlem kayıtları kapsanır. Prisma Client ve geçici PGlite veritabanları kullanılır. |
+| `npm run test:e2e`                  | Üretim derlemesi ve 3 Playwright testi başarılı. Keşif/arama/mobil okuma; kayıt/kütüphane/yorum/yayın/premium; ücretli metnin HTML/RSC/liste yanıtlarından korunması.                                                                                                                                                |
+| `npm run typecheck`, `npm run lint` | Başarılı.                                                                                                                                                                                                                                                                                                            |
+| Prisma şeması                       | Doğrulama ve istemci üretimi başarılı.                                                                                                                                                                                                                                                                               |
+| Migration geçişi                    | Mevcut yerel veriler korundu; tekrar çalıştırma, tanınmayan eski geçmiş ve checksum uyuşmazlığı test edildi.                                                                                                                                                                                                         |
+| Tarih hassasiyeti                   | Mikrosaniyeli eski ilk yayın zamanı yeniden yayında aynen korunuyor.                                                                                                                                                                                                                                                 |
+| Görsel kontrol                      | Masaüstü ve mobilde ana sayfa, kitap detayları ve okuyucu incelendi; kapaklar yükleniyor, yatay taşma yok.                                                                                                                                                                                                           |
+| Mobil erişilebilirlik               | Menü odağı, Escape ile kapatma ve açma düğmesine odak dönüşü test edildi.                                                                                                                                                                                                                                            |
+| Bağımlılıklar                       | Son `npm audit` kontrolünde 0 bilinen açık.                                                                                                                                                                                                                                                                          |
 
 Bu sonuçlar mevcut yerel doğrulama kaydıdır. Gerçek PostgreSQL sunucusu, üretim e-posta teslimi, yedekten dönüş, yük testleri ve uzak CI çalıştırması bu kontrolde doğrulanmış değildir.
 
@@ -651,30 +661,30 @@ Bu sonuçlar mevcut yerel doğrulama kaydıdır. Gerçek PostgreSQL sunucusu, ü
 
 Saf iş kuralları unit test, transaction ve eşzamanlılık gerçek PostgreSQL entegrasyon testi, kullanıcı yolculukları Playwright ile doğrulanır. SQLite taklidi finans ve kilit davranışının testi için yeterli değildir.
 
-| Senaryo | Beklenen sonuç |
-| --- | --- |
-| 3 cilt / 100 bölüm oluşturma ve sıralama | Her bölüm doğru ciltte görünür, toplam 100'dür, sıra değişince URL ve satın alma kimliği korunur. |
-| Onaysız kitabı doğrudan API/Action ile yayımlama | Sunucuda reddedilir. |
-| Başvurudan sonra taslak değiştirme | İnceleme ekranındaki gönderilmiş sürüm değişmez. |
-| Premium öncesi bölümün fiyatını değiştirme | UI, doğrudan komut ve zamanlanmış işte reddedilir. |
-| Onaydan önce hazırlanmış, sonra yayımlanan bölüm | Ücretli yayın koşullarını sağlıyorsa kabul edilir. |
-| Premium onayıyla ilk yayın aynı anda | Kilit ve sunucu zamanına göre tek, tutarlı sonuç oluşur. |
-| Eski bölümün düzenlenmesi/taşınması/yeniden yayını | İlk yayın tarihi değişmez; ücretli olmaya uygun hale gelmez. |
-| İki sekmede aynı taslağın kaydı | Eski sürüm yazımı conflict verir; veri sessizce ezilmez. |
-| Kullanıcı başka yazarın bölüm kimliğini gönderir | Okuma/düzenleme/satış işlemlerinde sahiplik kontrolü yapılır. |
-| Yetkisiz ücretli metin isteği | HTML, RSC payload, JSON, metadata ve cache'te tam metin bulunmaz. |
-| Kullanıcı A'nın satın alımından sonra kullanıcı B aynı URL'yi açar | A'nın metni B'ye önbellekten verilmez; çıkış sonrası da sızıntı olmaz. |
-| Ücretsiz bölüm ücretli hale gelir | Önceki ortak body cache'i bulunmaz; yeni istekte erişim kontrolü uygulanır. |
-| Aynı webhook 10 kez veya sıra dışı gelir | Tek geçerli finans sonucu ve tek erişim hakkı; eski olay sonucu geri almaz. |
-| Sahte/yanlış tutarlı webhook | Hak açılmaz; olay reddedilir veya incelemeye alınır. |
-| Aynı bölüm için iki eşzamanlı checkout | Tek aktif rezervasyon; fazla tahsilat olursa uzlaştırılıp iade edilir. |
-| Tahsilat sonrası yerel işlem çöker | Tekrar işleme/mutabakat ile hak ve muhasebe atomik olarak tamamlanır. |
-| İade sonrası aynı bölümü yeniden satın alma | Yeni sipariş ve gelir kaydı oluşur; tek erişim kaydı yeniden aktifleşir. |
-| Premium askıya alınır veya kitap arşivlenir | Yeni satış durur, mevcut satın alımlar okunur. |
-| İçerik ihlaliyle kitap gizlenir | Satış ve okuyucu erişimi kapanır; ilgili destek/iade kayıtları açılır. |
-| Puan değiştirme ve kendi kitabına puan | İlkinde tek kayıt güncellenir; ikincisi reddedilir. |
-| Worker kapanıp yeniden açılır | Vadesi geçen yayın yakalanır; aynı yayın/bildirim olayı çoğalmaz. |
-| Yedekten kurtarma | Yayın sürümleri ve finans kayıtları geri gelir; sağlayıcıyla mutabakat yapılır. |
+| Senaryo                                                            | Beklenen sonuç                                                                                    |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| 3 cilt / 100 bölüm oluşturma ve sıralama                           | Her bölüm doğru ciltte görünür, toplam 100'dür, sıra değişince URL ve satın alma kimliği korunur. |
+| Onaysız kitabı doğrudan API/Action ile yayımlama                   | Sunucuda reddedilir.                                                                              |
+| Başvurudan sonra taslak değiştirme                                 | İnceleme ekranındaki gönderilmiş sürüm değişmez.                                                  |
+| Premium öncesi bölümün fiyatını değiştirme                         | UI, doğrudan komut ve zamanlanmış işte reddedilir.                                                |
+| Onaydan önce hazırlanmış, sonra yayımlanan bölüm                   | Ücretli yayın koşullarını sağlıyorsa kabul edilir.                                                |
+| Premium onayıyla ilk yayın aynı anda                               | Kilit ve sunucu zamanına göre tek, tutarlı sonuç oluşur.                                          |
+| Eski bölümün düzenlenmesi/taşınması/yeniden yayını                 | İlk yayın tarihi değişmez; ücretli olmaya uygun hale gelmez.                                      |
+| İki sekmede aynı taslağın kaydı                                    | Eski sürüm yazımı conflict verir; veri sessizce ezilmez.                                          |
+| Kullanıcı başka yazarın bölüm kimliğini gönderir                   | Okuma/düzenleme/satış işlemlerinde sahiplik kontrolü yapılır.                                     |
+| Yetkisiz ücretli metin isteği                                      | HTML, RSC payload, JSON, metadata ve cache'te tam metin bulunmaz.                                 |
+| Kullanıcı A'nın satın alımından sonra kullanıcı B aynı URL'yi açar | A'nın metni B'ye önbellekten verilmez; çıkış sonrası da sızıntı olmaz.                            |
+| Ücretsiz bölüm ücretli hale gelir                                  | Önceki ortak body cache'i bulunmaz; yeni istekte erişim kontrolü uygulanır.                       |
+| Aynı webhook 10 kez veya sıra dışı gelir                           | Tek geçerli finans sonucu ve tek erişim hakkı; eski olay sonucu geri almaz.                       |
+| Sahte/yanlış tutarlı webhook                                       | Hak açılmaz; olay reddedilir veya incelemeye alınır.                                              |
+| Aynı bölüm için iki eşzamanlı checkout                             | Tek aktif rezervasyon; fazla tahsilat olursa uzlaştırılıp iade edilir.                            |
+| Tahsilat sonrası yerel işlem çöker                                 | Tekrar işleme/mutabakat ile hak ve muhasebe atomik olarak tamamlanır.                             |
+| İade sonrası aynı bölümü yeniden satın alma                        | Yeni sipariş ve gelir kaydı oluşur; tek erişim kaydı yeniden aktifleşir.                          |
+| Premium askıya alınır veya kitap arşivlenir                        | Yeni satış durur, mevcut satın alımlar okunur.                                                    |
+| İçerik ihlaliyle kitap gizlenir                                    | Satış ve okuyucu erişimi kapanır; ilgili destek/iade kayıtları açılır.                            |
+| Puan değiştirme ve kendi kitabına puan                             | İlkinde tek kayıt güncellenir; ikincisi reddedilir.                                               |
+| Worker kapanıp yeniden açılır                                      | Vadesi geçen yayın yakalanır; aynı yayın/bildirim olayı çoğalmaz.                                 |
+| Yedekten kurtarma                                                  | Yayın sürümleri ve finans kayıtları geri gelir; sağlayıcıyla mutabakat yapılır.                   |
 
 Ücretli lansmanın tamamlanma ölçütü: bu kritik senaryoların geçmesi, sandbox uçtan uca tahsilat/iade/aktarım akışının doğrulanması, destek/moderasyon araçlarının hazır olması ve sağlayıcı canlı hesap koşullarının tamamlanmasıdır. [Next.js production kontrol rehberi](https://nextjs.org/docs/app/guides/production-checklist) de dağıtım kontrollerine dahil edilir.
 
@@ -714,14 +724,14 @@ Yazar onboarding'i, premium başvurusu, tarih kuralı, fiyatlandırma, checkout,
 
 Mimari aşağıdaki konulara varsayılan kararlarla devam edebilir; ücretli üretim açılmadan gerçek değerler belirlenmelidir:
 
-| Konu | Tasarımda kullanılan yaklaşım |
-| --- | --- |
-| Şirket/ülke ve ödeme kabulü | Türkiye/TRY, iyzico Pazaryeri; uygunluk sağlayıcıyla doğrulanacak. |
-| Fiyat ve komisyon | Kuruş bazlı fiyat, sürümlü baz puan komisyonu, kesintiyi platformun karşılaması önerisi; oranlar açık. |
-| Yazar ödemesi | Sağlayıcı onboarding ve aktarım koşulları; ödeme takvimi ticari anlaşmayla belirlenecek. |
-| Ücretsizden ücretliye geçiş | Yalnız ilk premium onayından sonra ilk kez yayımlanmış bölümler için izinli. |
-| İçerik ve yaş politikası | İçerik uyarıları ve moderasyon zorunlu; izin verilen içerik sınırları işletmece yazılacak. |
-| İade ve saklama politikası | Kalem bazlı iade ve silinmeyen finans izi; yasal süre/metinler ayrıca belirlenecek. |
-| Operasyon kapasitesi | Başvuru ve destek yanıt hedefleri ekip kapasitesine göre belirlenecek. |
+| Konu                        | Tasarımda kullanılan yaklaşım                                                                          |
+| --------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Şirket/ülke ve ödeme kabulü | Türkiye/TRY, iyzico Pazaryeri; uygunluk sağlayıcıyla doğrulanacak.                                     |
+| Fiyat ve komisyon           | Kuruş bazlı fiyat, sürümlü baz puan komisyonu, kesintiyi platformun karşılaması önerisi; oranlar açık. |
+| Yazar ödemesi               | Sağlayıcı onboarding ve aktarım koşulları; ödeme takvimi ticari anlaşmayla belirlenecek.               |
+| Ücretsizden ücretliye geçiş | Yalnız ilk premium onayından sonra ilk kez yayımlanmış bölümler için izinli.                           |
+| İçerik ve yaş politikası    | İçerik uyarıları ve moderasyon zorunlu; izin verilen içerik sınırları işletmece yazılacak.             |
+| İade ve saklama politikası  | Kalem bazlı iade ve silinmeyen finans izi; yasal süre/metinler ayrıca belirlenecek.                    |
+| Operasyon kapasitesi        | Başvuru ve destek yanıt hedefleri ekip kapasitesine göre belirlenecek.                                 |
 
 Kaynak bağlantıları teknoloji yeteneklerini doğrulamak için eklenmiştir. Bölüm uygunluğu, ücretsizden ücretliye geçiş, satış kapsamı ve erişimin korunması gibi davranışlar bu platform için önerilen ürün/mimari kararlarıdır; dış kaynakların zorunlu kıldığı kurallar değildir.

@@ -6,6 +6,11 @@ import type { Prisma } from "@/generated/prisma/client";
 import { DomainError, requireReviewer } from "@/modules/publishing/policies";
 import { bookInput } from "@/modules/publishing/service";
 import { deleteImage } from "@/lib/cloudinary";
+import {
+  bookTagSelection,
+  replaceBookTags,
+  tagNames,
+} from "@/modules/catalog/tags";
 
 const baseInput = z.object({
   id: z.string().min(1).max(128),
@@ -20,7 +25,12 @@ export const userInput = baseInput.extend({
   role: z.enum(["reader", "admin"]),
 });
 export const bookUpdateInput = baseInput.extend({
-  ...bookInput.pick({ title: true, description: true, genre: true }).shape,
+  ...bookInput.pick({
+    title: true,
+    description: true,
+    genres: true,
+    tags: true,
+  }).shape,
   storyStatus: z.enum(["ONGOING", "COMPLETED", "HIATUS"]),
   hidden: z.boolean(),
   featured: z.boolean(),
@@ -217,7 +227,10 @@ export async function updateBook(
   const removedPublicId = await administrativeWrite(db, actor, async (tx) => {
     // Use the same book lock/order as publishing; do not bypass publication/premium approval.
     await tx.$queryRaw`SELECT id FROM books WHERE id = ${input.id} FOR UPDATE`;
-    const book = await tx.book.findUnique({ where: { id: input.id } });
+    const book = await tx.book.findUnique({
+      where: { id: input.id },
+      include: { tags: bookTagSelection },
+    });
     if (!book) throw new DomainError("NOT_FOUND", "Kitap bulunamadı.");
     if (input.featured && (book.status !== "PUBLISHED" || input.hidden))
       throw new DomainError(
@@ -225,20 +238,23 @@ export async function updateBook(
         "Vitrine yalnız görünür ve yayındaki kitaplar eklenebilir.",
       );
     const { id, reason, removeCoverImage, ...data } = input;
+    const { tags, ...details } = data;
     const dropCover = removeCoverImage && Boolean(book.coverUrl);
     await tx.book.update({
       where: { id },
       data: {
-        ...data,
+        ...details,
         ...(dropCover && { coverUrl: null, coverPublicId: null }),
         updatedAt: new Date(),
       },
     });
+    await replaceBookTags(tx, id, tags);
     await audit(tx, actor, "ADMIN_BOOK_UPDATED", id, reason, {
       before: {
         title: book.title,
         description: book.description,
-        genre: book.genre,
+        genres: book.genres,
+        tags: tagNames(book.tags),
         storyStatus: book.storyStatus,
         hidden: book.hidden,
         featured: book.featured,

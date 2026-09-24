@@ -9,8 +9,9 @@ import { ChapterEditor } from "@/components/chapter-editor";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import {
   publishChapterAction,
-  setChapterPriceAction,
+  setChapterAccessAction,
 } from "@/modules/publishing/actions";
+import { getChapterPrice } from "@/modules/coins/service";
 import { ArrowLeft, ArrowUpRight } from "@/components/icons";
 async function EditChapter({
   params,
@@ -22,6 +23,7 @@ async function EditChapter({
     params,
   ]);
   const db = getDb();
+  const chapterPrice = await getChapterPrice(db);
   const chapter = await db.chapter.findFirst({
     where: { id: chapterId, bookId, book: { authorId: actor.id } },
     select: {
@@ -31,7 +33,7 @@ async function EditChapter({
       version: true,
       status: true,
       firstPublishedAt: true,
-      priceMinor: true,
+      accessType: true,
       book: {
         select: {
           title: true,
@@ -113,26 +115,37 @@ async function EditChapter({
           <h3>Bölüm erişimi</h3>
           <p>
             {eligible
-              ? "Bu bölüm premium onayından sonra yayımlandı. Fiyat belirleyebilir veya ücretsiz bırakabilirsin. Gerçek tahsilat henüz açık değil."
-              : "Premium onayından önce yayımlanan bölümler ücretsiz kalır. Ücretlendirme, onaydan sonra ilk kez yayımlanan bölümlerde açılır."}
+              ? `Bu bölüm premium onayından sonra yayımlandı; premium yapabilirsin. Okurlar premium bölümleri platformun sabit fiyatıyla (şu an ${chapterPrice} coin) açar. Fiyatı yazar belirlemez.`
+              : "Premium onayından önce yayımlanan bölümler daima ücretsiz kalır. Premium, onaydan sonra ilk kez yayımlanan bölümlerde açılır."}
           </p>
-          <ActionForm action={setChapterPriceAction} className="inline-form">
+          <ActionForm action={setChapterAccessAction} className="form-stack">
             <input type="hidden" name="chapterId" value={chapterId} />
-            <label className="field">
-              Fiyat (₺)
-              <input
-                name="price"
-                type="number"
-                min={0}
-                max={1000}
-                step="0.01"
-                defaultValue={chapter.priceMinor / 100}
-                disabled={!eligible}
-              />
-            </label>
-            <SubmitButton className="button-outline" disabled={!eligible}>
-              Kaydet
-            </SubmitButton>
+            <fieldset className="access-options" disabled={!eligible}>
+              <legend className="sr-only">Bölüm erişimi</legend>
+              <label className="check-field">
+                <input
+                  type="radio"
+                  name="access"
+                  value="FREE"
+                  defaultChecked={chapter.accessType !== "PAID"}
+                />
+                Ücretsiz · herkes okuyabilir
+              </label>
+              <label className="check-field">
+                <input
+                  type="radio"
+                  name="access"
+                  value="PAID"
+                  defaultChecked={chapter.accessType === "PAID"}
+                />
+                Premium · {chapterPrice} coin ile açılır
+              </label>
+            </fieldset>
+            <div>
+              <SubmitButton className="button-outline" disabled={!eligible}>
+                Erişimi kaydet
+              </SubmitButton>
+            </div>
           </ActionForm>
         </section>
       </div>

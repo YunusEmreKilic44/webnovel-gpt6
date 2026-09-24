@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 import { requireAdmin } from "@/modules/admin/access";
 import { AdminSidebar } from "@/components/admin-sidebar";
+import { getDb } from "@/db";
+import { countOpenReports } from "@/modules/reports/service";
 import { PageSkeleton } from "@/components/loading-skeletons";
 
 export const metadata = {
@@ -20,9 +22,10 @@ export default function AdminLayout({
 }
 async function AuthorizedLayout({ children }: { children: React.ReactNode }) {
   const actor = await requireAdmin();
+  const openReports = await countOpenReports(getDb());
   return (
     <div className="admin-layout">
-      <AdminSidebar name={actor.name} />
+      <AdminSidebar name={actor.name} openReports={openReports} />
       <div className="admin-content">{children}</div>
     </div>
   );

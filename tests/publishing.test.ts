@@ -6,17 +6,20 @@ import { createLocalDatabase } from "./support/database";
 import { getDb } from "@/db";
 import {
   getCatalog,
+  getGenreCounts,
   getPublicBook,
   getPublicChapters,
 } from "@/modules/catalog/queries";
 import {
   addChapter,
   addVolume,
+  bookInput,
   createBook,
+  updateBookDetails,
   publishChapter,
   reviewApplication,
   saveChapter,
-  setChapterPrice,
+  setChapterAccess,
   submitApplication,
 } from "@/modules/publishing/service";
 import {
@@ -24,6 +27,7 @@ import {
   requirePaidEligibility,
 } from "@/modules/publishing/policies";
 import { parseContent } from "@/modules/publishing/content";
+import { bookGenres, genres } from "@/lib/genres";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/db", async (importOriginal) => ({
@@ -63,6 +67,16 @@ let volumeId: string;
 beforeAll(async () => {
   vi.mocked(getDb).mockReturnValue(db);
   await migrateLocal(client);
+  // These flows test publishing rules, not the premium thresholds
+  // (covered in application-rules.test.ts).
+  await db.coinSettings.update({
+    where: { id: 1 },
+    data: {
+      premiumMinChapters: 0,
+      premiumMinReads: 0,
+      premiumApplicationsEnabled: true,
+    },
+  });
   for (const actor of [writer, admin, stranger])
     await db.user.create({
       data: { ...actor, email: `${actor.id}@example.test` },
@@ -73,12 +87,86 @@ afterAll(async () => {
 });
 
 describe("Yayın ve premium akışı — gerçek PostgreSQL motoru", () => {
+  it("seçilebilir tüm kategorileri kabul eder, filtre değerlerini kitap türü olarak reddeder", () => {
+    for (const genre of genres.filter((value) => value !== "Tümü")) {
+      expect(bookInput.shape.genres.safeParse([genre]).success).toBe(true);
+    }
+    expect(new Set(bookGenres).size).toBe(bookGenres.length);
+    expect(bookInput.shape.genres.safeParse(["Tümü"]).success).toBe(false);
+    expect(bookInput.shape.genres.safeParse(["geçersiz tür"]).success).toBe(
+      false,
+    );
+    expect(bookInput.shape.genres.safeParse([]).success).toBe(false);
+    expect(bookInput.shape.genres.safeParse("Fantastik").success).toBe(false);
+    const fiveGenres = bookGenres.slice(0, 5);
+    expect(bookInput.shape.genres.safeParse(fiveGenres).success).toBe(true);
+    expect(
+      bookInput.shape.genres.safeParse(bookGenres.slice(0, 6)).success,
+    ).toBe(false);
+    expect(
+      bookInput.shape.genres.parse([...fiveGenres, fiveGenres[0]]),
+    ).toEqual(fiveGenres);
+    expect(
+      bookInput.shape.genres.safeParse(["Fantastik", "Tümü"]).success,
+    ).toBe(false);
+    expect(
+      bookInput.shape.genres.parse(["Gizem", "Fantastik", "Gizem"]),
+    ).toEqual(["Fantastik", "Gizem"]);
+  });
+
+  it("çoklu kategorileri kaydeder, filtreler ve toplamda kitabı bir kez sayar", async () => {
+    const before = await getGenreCounts();
+    const details = {
+      title: "Başka Dünyanın Yolcusu",
+      description:
+        "Oyun kurallarıyla işleyen başka bir dünyada geçen uzun bir macera.",
+      genres: ["Isekai", "Fantastik"] as (typeof bookGenres)[number][],
+      cover: "forest" as const,
+    };
+    const id = await createBook(db, writer, details);
+    expect(await db.book.findUnique({ where: { id } })).toMatchObject({
+      genres: ["Fantastik", "Isekai"],
+    });
+    await updateBookDetails(db, writer, {
+      ...details,
+      bookId: id,
+      genres: ["LitRPG", "Gizem", "LitRPG"],
+      storyStatus: "ONGOING",
+      removeCoverImage: false,
+    });
+    await db.book.update({ where: { id }, data: { status: "PUBLISHED" } });
+    expect(await db.book.findUnique({ where: { id } })).toMatchObject({
+      genres: ["Gizem", "LitRPG"],
+    });
+    expect(
+      (await getCatalog({ genre: "LitRPG" })).map((book) => book.id),
+    ).toContain(id);
+    expect(
+      (await getCatalog({ genre: "Isekai" })).map((book) => book.id),
+    ).not.toContain(id);
+    expect(
+      (await getCatalog({ genre: "Gizem" })).map((book) => book.id),
+    ).toContain(id);
+    expect((await getCatalog()).filter((book) => book.id === id)).toHaveLength(
+      1,
+    );
+    const counts = await getGenreCounts();
+    expect(counts["Tümü"]).toBe((before["Tümü"] ?? 0) + 1);
+    expect(counts.Gizem).toBe((before.Gizem ?? 0) + 1);
+    expect(counts.LitRPG).toBe((before.LitRPG ?? 0) + 1);
+    await db.book.update({ where: { id }, data: { hidden: true } });
+    expect((await getGenreCounts())["Tümü"]).toBe(before["Tümü"]);
+    expect(
+      (await getCatalog({ genre: "Gizem" })).map((book) => book.id),
+    ).not.toContain(id);
+  });
+
   it("kitap oluşturur, varsayılan cilt ve taslak bölüm bağlar", async () => {
     bookId = await createBook(db, writer, {
       title: "Test Dünyası",
       description:
         "Yeni dünyalara açılan uzun ve gizemli bir yolculuğun hikâyesi.",
-      genre: "Fantastik",
+      genres: ["Fantastik"],
       cover: "forest",
     });
     const [chapter] = await db.chapter.findMany({ where: { bookId: bookId } });
@@ -124,12 +212,20 @@ describe("Yayın ve premium akışı — gerçek PostgreSQL motoru", () => {
     ).rejects.toMatchObject({ code: "REVISION_CONFLICT" });
   });
   it("başvuru anlık görüntüsünü korur ve yinelenen başvuruyu engeller", async () => {
+    await db.book.update({
+      where: { id: bookId },
+      data: { genres: ["Fantastik", "Macera"] },
+    });
     await submitApplication(db, writer, bookId, "PUBLICATION");
     await expect(
       submitApplication(db, writer, bookId, "PUBLICATION"),
     ).rejects.toMatchObject({ code: "ALREADY_PENDING" });
     const [app] = await db.application.findMany({ where: { bookId: bookId } });
     expect((app.snapshot as ApplicationSnapshot).chapters[0].version).toBe(2);
+    expect((app.snapshot as ApplicationSnapshot).genres).toEqual([
+      "Fantastik",
+      "Macera",
+    ]);
     await expect(
       reviewApplication(db, writer, app.id, "APPROVED", "Kendi onayım"),
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
@@ -155,7 +251,7 @@ describe("Yayın ve premium akışı — gerçek PostgreSQL motoru", () => {
   });
   it("ilk yayını açar ve premium öncesi bölümü ücretlendirmez", async () => {
     await expect(
-      setChapterPrice(db, writer, chapterId, 500),
+      setChapterAccess(db, writer, chapterId, true),
     ).rejects.toMatchObject({ code: "PREMIUM_NOT_ACTIVE" });
     await submitApplication(db, writer, bookId, "PREMIUM");
     const apps = await db.application.findMany({ where: { bookId: bookId } });
@@ -168,7 +264,7 @@ describe("Yayın ve premium akışı — gerçek PostgreSQL motoru", () => {
       "Premium incelemesi uygun.",
     );
     await expect(
-      setChapterPrice(db, writer, chapterId, 500),
+      setChapterAccess(db, writer, chapterId, true),
     ).rejects.toMatchObject({ code: "CHAPTER_PREDATES_PREMIUM" });
   });
   it("düzenleme ve yeniden yayın ilk yayın tarihini değiştirmez", async () => {
@@ -185,10 +281,10 @@ describe("Yayın ve premium akışı — gerçek PostgreSQL motoru", () => {
     const [after] = await db.chapter.findMany({ where: { id: chapterId } });
     expect(after.firstPublishedAt).toEqual(before.firstPublishedAt);
     await expect(
-      setChapterPrice(db, writer, chapterId, 500),
+      setChapterAccess(db, writer, chapterId, true),
     ).rejects.toMatchObject({ code: "CHAPTER_PREDATES_PREMIUM" });
   });
-  it("onay sonrası yeni bölüm ücretli olur; genel okuyucuya açılmaz", async () => {
+  it("onay sonrası yeni bölüm premium olur; genel okuyucuya açılmaz", async () => {
     const nextId = await addChapter(
       db,
       writer,
@@ -203,12 +299,12 @@ describe("Yayın ve premium akışı — gerçek PostgreSQL motoru", () => {
       expectedVersion: 1,
     });
     await publishChapter(db, writer, nextId, 2);
-    await setChapterPrice(db, writer, nextId, 750);
+    await setChapterAccess(db, writer, nextId, true);
     const [book] = await db.book.findMany({ where: { id: bookId } });
     const [chapter] = await db.chapter.findMany({ where: { id: nextId } });
-    expect(chapter.priceMinor).toBe(750);
+    expect(chapter.accessType).toBe("PAID");
     expect(canReadPublic(book, chapter)).toBe(false);
-    await setChapterPrice(db, writer, nextId, 0);
+    await setChapterAccess(db, writer, nextId, false);
     const [free] = await db.chapter.findMany({ where: { id: nextId } });
     expect(canReadPublic(book, free)).toBe(true);
   });
@@ -217,7 +313,7 @@ describe("Yayın ve premium akışı — gerçek PostgreSQL motoru", () => {
       title: "Başka Kitap",
       description:
         "Yeterince uzun bir özet ve bambaşka bir dünyaya açılan kapı.",
-      genre: "Gizem",
+      genres: ["Gizem"],
       cover: "ocean",
     });
     await expect(
@@ -261,7 +357,7 @@ describe("Yayın ve premium akışı — gerçek PostgreSQL motoru", () => {
       title: "Sabit Başvuru",
       description:
         "İncelemeye gönderilen sürümün sonradan değişmediği bir kitap örneği.",
-      genre: "Gizem",
+      genres: ["Gizem"],
       cover: "ocean",
     });
     const [draft] = await db.chapter.findMany({ where: { bookId: freshBook } });
@@ -314,7 +410,7 @@ describe("Onayla otomatik yayın", () => {
       title: "Toplu İlk Yayın",
       description:
         "İncelenen bölümler ve daha sonra yazılan taslaklar ayrı tutulur.",
-      genre: "Fantastik",
+      genres: ["Fantastik"],
       cover: "forest",
     });
     const first = await db.chapter.findFirstOrThrow({
@@ -377,7 +473,7 @@ describe("Onayla otomatik yayın", () => {
         title: `Geçersiz Örnek ${failure}`,
         description:
           "İnceleme sonrasında kullanılamayan bir bölümün yayın kontrolü.",
-        genre: "Gizem",
+        genres: ["Gizem"],
         cover: "ocean",
       });
       const first = await db.chapter.findFirstOrThrow({
@@ -445,7 +541,7 @@ describe("Yöneticinin kendi kitabını değerlendirmesi", () => {
       title: `Yönetici Kitabı ${type} ${decision}`,
       description:
         "Yöneticinin yazdığı kitabın yayın ve premium başvurusu örneği.",
-      genre: "Fantastik",
+      genres: ["Fantastik"],
       cover: "forest",
     });
     const chapter = await db.chapter.findFirstOrThrow({
@@ -542,7 +638,7 @@ describe("Güvenli içerik ve tarih sınırları", () => {
       title: "Eski Kayıt",
       description:
         "Eski veritabanından taşınmış bir kitabın mikrosaniye hassasiyetindeki tarih kaydı.",
-      genre: "Gizem",
+      genres: ["Gizem"],
       cover: "ocean",
     });
     const chapter = await db.chapter.findFirstOrThrow({
