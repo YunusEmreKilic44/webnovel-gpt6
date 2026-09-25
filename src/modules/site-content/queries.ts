@@ -1,6 +1,7 @@
 import "server-only";
 import { getDb } from "@/db";
 import { requireAdmin } from "@/modules/admin/access";
+import { cache } from "react";
 
 const slideSelect = {
   id: true,
@@ -25,9 +26,31 @@ export async function getAnnouncements() {
   return getDb().announcement.findMany({
     where: { published: true },
     orderBy,
-    take: 50,
+    select: { id: true, title: true, body: true, createdAt: true },
+    take: 3,
   });
 }
+export const ANNOUNCEMENTS_PAGE_SIZE = 12;
+export async function getAnnouncementArchive(requestedPage = 1) {
+  const db = getDb();
+  const total = await db.announcement.count({ where: { published: true } });
+  const pages = Math.max(1, Math.ceil(total / ANNOUNCEMENTS_PAGE_SIZE));
+  const page = Math.min(
+    pages,
+    Math.max(1, Number.isSafeInteger(requestedPage) ? requestedPage : 1),
+  );
+  const rows = await db.announcement.findMany({
+    where: { published: true },
+    orderBy,
+    select: { id: true, title: true, body: true, createdAt: true },
+    skip: (page - 1) * ANNOUNCEMENTS_PAGE_SIZE,
+    take: ANNOUNCEMENTS_PAGE_SIZE,
+  });
+  return { rows, page, pages, total };
+}
+export const getPublishedAnnouncement = cache(async (id: string) =>
+  getDb().announcement.findFirst({ where: { id, published: true } }),
+);
 export async function getHomeSlides() {
   const slides = await getDb().homeSlide.findMany({
     where: { published: true },

@@ -94,7 +94,15 @@ async function BookDetail({ params }: Props) {
           </div>
           <h1>{book.title}</h1>
           <p className="detail-author">
-            <Link href={`/yazar/${book.authorId}`}>{book.author}</Link>
+            <Link href={`/yazar/${book.authorId}`}>
+              <Avatar
+                name={book.author}
+                url={book.authorAvatarUrl}
+                className="small-avatar"
+                size={28}
+              />
+              {book.author}
+            </Link>
           </p>
           <div className="detail-rating">
             <Star size={15} fill="currentColor" />

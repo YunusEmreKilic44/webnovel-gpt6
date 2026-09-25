@@ -17,6 +17,7 @@ import { BookCover } from "@/components/book-cover";
 import { BlockSkeleton } from "@/components/loading-skeletons";
 import {
   Bell,
+  BookOpen,
   Check,
   CheckCircle2,
   Coins,
@@ -229,6 +230,15 @@ function describe(item: Item, price: number) {
         ) : null,
     };
   }
+  if (item.type === "NEW_BOOK")
+    return {
+      Icon: BookOpen,
+      tone: "",
+      title: <>Takip ettiğin yazar yeni bir kitap yayımladı</>,
+      body: item.book?.title ?? "Yeni kitap",
+      note: null,
+      badge: <span className="label-pill">Yeni kitap</span>,
+    };
   if (
     item.type === "APPLICATION_APPROVED" ||
     item.type === "APPLICATION_REJECTED"

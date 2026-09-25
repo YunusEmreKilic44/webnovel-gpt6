@@ -82,6 +82,15 @@ async function reportTargetOwner(
         })
       )?.userId ?? null
     );
+  if (type === "PROFILE_COMMENT")
+    return (
+      (
+        await tx.profileComment.findFirst({
+          where: { id, hidden: false },
+          select: { authorId: true },
+        })
+      )?.authorId ?? null
+    );
   return (
     (await tx.user.findUnique({ where: { id }, select: { id: true } }))?.id ??
     null
@@ -219,6 +228,25 @@ export async function getReportTarget(db: Database, type: string, id: string) {
     });
     return comment && { type: "COMMENT" as const, comment };
   }
+  if (type === "PROFILE_COMMENT") {
+    const profileComment = await db.profileComment.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        body: true,
+        hidden: true,
+        createdAt: true,
+        author: { select: { id: true, name: true } },
+        profileUser: { select: { id: true, name: true } },
+      },
+    });
+    return (
+      profileComment && {
+        type: "PROFILE_COMMENT" as const,
+        profileComment,
+      }
+    );
+  }
   if (type === "USER") {
     const user = await db.user.findUnique({
       where: { id },
@@ -314,6 +342,8 @@ export async function resolveReport(
       });
     else if (report.targetType === "BOOK")
       await hideBook(db, actor, report.targetId, reason);
+    else if (report.targetType === "PROFILE_COMMENT")
+      await hideProfileComment(db, actor, report.targetId, reason);
     else
       throw new DomainError(
         "INVALID_ACTION",
@@ -358,6 +388,30 @@ export async function resolveReport(
     );
     await notifyReportsHandled(tx, closing, input.decision);
     return closed.count;
+  });
+}
+
+async function hideProfileComment(
+  db: Database,
+  actor: Actor,
+  commentId: string,
+  reason: string,
+) {
+  await administrativeWrite(db, actor, async (tx) => {
+    const comment = await tx.profileComment.findUnique({
+      where: { id: commentId },
+      select: { hidden: true, profileUserId: true },
+    });
+    if (!comment) throw new DomainError("NOT_FOUND", "Yorum bulunamadı.");
+    await tx.profileComment.update({
+      where: { id: commentId },
+      data: { hidden: true },
+    });
+    await audit(tx, actor, "ADMIN_PROFILE_COMMENT_HIDDEN", commentId, reason, {
+      before: comment.hidden,
+      after: true,
+      profileUserId: comment.profileUserId,
+    });
   });
 }
 

@@ -47,6 +47,7 @@ export type CatalogBook = Pick<
 > & {
   tags: string[];
   author: string;
+  authorAvatarUrl: string | null;
   chapterCount: number;
   volumeCount: number;
   averageRating: number;
@@ -73,6 +74,7 @@ const catalogColumns = Prisma.sql`
   b.cover_url AS "coverUrl", b.status,
   b.story_status AS "storyStatus", b.premium_status AS "premiumStatus",
   b.author_id AS "authorId", b.featured, b.updated_at AS "updatedAt", u.name AS author,
+  u.avatar_url AS "authorAvatarUrl",
   ch.chapter_count AS "chapterCount", ch.volume_count AS "volumeCount",
   rt.average_rating AS "averageRating", rt.rating_count AS "ratingCount"
 `;
@@ -131,7 +133,7 @@ async function queryCatalog(filters: CatalogFilters): Promise<StoredBook[]> {
   `);
   return rows.map(storeBook);
 }
-const cachedCatalog = catalogCache("catalog-list-v3-tags", queryCatalog);
+const cachedCatalog = catalogCache("catalog-list-v4-avatar", queryCatalog);
 
 export async function getCatalog(filters: CatalogFilters = {}) {
   // Free-text and user-defined tag filters stay uncached: arbitrary terms grow the key space
@@ -181,7 +183,7 @@ async function queryPublicBook(slug: string) {
   `);
   return rows[0] ? storeBook(rows[0]) : null;
 }
-const cachedPublicBook = catalogCache("public-book-v3-tags", queryPublicBook);
+const cachedPublicBook = catalogCache("public-book-v4-avatar", queryPublicBook);
 
 export const getPublicBook = cache(async (slug: string) => {
   const row = await cachedPublicBook(slug);

@@ -7,6 +7,7 @@ type Tx = Prisma.TransactionClient;
 
 export type NotificationType =
   | "NEW_CHAPTER"
+  | "NEW_BOOK"
   | "APPLICATION_APPROVED"
   | "APPLICATION_REJECTED"
   | "REPORT_RESOLVED"
@@ -29,6 +30,24 @@ export async function notifyNewChapter(
     FROM library_entries l JOIN "user" u ON u.id = l.user_id
     WHERE l.book_id = ${chapter.bookId} AND l.user_id <> ${authorId} AND NOT u.banned
     ON CONFLICT (user_id, chapter_id, type) DO NOTHING
+  `;
+}
+
+/**
+ * A book went public for the first time: tell everyone following its author.
+ * The partial unique index (user, book) for NEW_BOOK keeps it to one notice
+ * per book even if the book is later hidden and shown again.
+ */
+export async function notifyFollowersOfNewBook(
+  tx: Tx,
+  book: { id: string; authorId: string },
+) {
+  return tx.$executeRaw`
+    INSERT INTO notifications (id, user_id, type, book_id)
+    SELECT gen_random_uuid()::text, f.follower_id, 'NEW_BOOK', ${book.id}
+    FROM author_follows f JOIN "user" u ON u.id = f.follower_id
+    WHERE f.author_id = ${book.authorId} AND NOT u.banned
+    ON CONFLICT (user_id, book_id) WHERE type = 'NEW_BOOK' DO NOTHING
   `;
 }
 
@@ -83,6 +102,7 @@ const visible = {
       chapter: { status: "PUBLISHED", hidden: false },
       book: { status: "PUBLISHED", hidden: false },
     },
+    { type: "NEW_BOOK", book: { status: "PUBLISHED", hidden: false } },
     { type: { in: ["APPLICATION_APPROVED", "APPLICATION_REJECTED"] } },
     { type: { in: ["REPORT_RESOLVED", "REPORT_DISMISSED"] } },
   ],
@@ -170,7 +190,13 @@ export async function markNotificationRead(
   const id = parsed.data;
   const notification = await db.notification.findFirst({
     where: { id, userId },
-    select: { type: true, chapterId: true, bookId: true, readAt: true },
+    select: {
+      type: true,
+      chapterId: true,
+      bookId: true,
+      readAt: true,
+      book: { select: { slug: true } },
+    },
   });
   if (!notification) return null;
   if (!notification.readAt)
@@ -180,6 +206,8 @@ export async function markNotificationRead(
     });
   if (notification.type === "NEW_CHAPTER" && notification.chapterId)
     return `/oku/${notification.chapterId}`;
+  if (notification.type === "NEW_BOOK" && notification.book)
+    return `/kitap/${notification.book.slug}`;
   if (notification.type.startsWith("APPLICATION_") && notification.bookId)
     return `/studio/books/${notification.bookId}`;
   return "/bildirimler";

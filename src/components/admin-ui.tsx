@@ -28,6 +28,7 @@ export const auditLabels: Record<string, string> = {
   ADMIN_SLIDE_SAVED: "Slayt kaydedildi",
   ADMIN_SLIDE_DELETED: "Slayt silindi",
   ADMIN_FEATURE_TOGGLED: "Özellik açıldı/kapatıldı",
+  ADMIN_PROFILE_COMMENT_HIDDEN: "Profil yorumu gizlendi",
   ADMIN_REPORT_RESOLVED: "Şikâyet çözüldü",
   ADMIN_REPORT_DISMISSED: "Şikâyet reddedildi",
   ADMIN_COIN_PRICE_UPDATED: "Premium bölüm fiyatı değişti",

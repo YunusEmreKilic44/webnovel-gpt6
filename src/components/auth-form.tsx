@@ -11,15 +11,25 @@ export function AuthForm({
   mode,
   token,
   localPreview,
+  emailUnavailable = false,
 }: {
   mode: "login" | "register" | "forgot" | "reset";
   token?: string;
   localPreview?: boolean;
+  /** No email service configured: verification and reset mails cannot go out. */
+  emailUnavailable?: boolean;
 }) {
   const hydrated = useHydrated();
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
   const [success, setSuccess] = useState(false);
+  // Set when sign-in fails because the address is not verified yet.
+  const [unverifiedEmail, setUnverifiedEmail] = useState("");
+  const [resend, setResend] = useState<"idle" | "sending" | "sent" | "failed">(
+    "idle",
+  );
+  const blocked =
+    emailUnavailable && (mode === "register" || mode === "forgot");
   const router = useRouter();
   const titles = {
     login: "Hikâyene kaldığın yerden.",
@@ -32,6 +42,8 @@ export function AuthForm({
     setPending(true);
     setMessage("");
     setSuccess(false);
+    setUnverifiedEmail("");
+    setResend("idle");
     const form = new FormData(event.currentTarget);
     const email = String(form.get("email"));
     const password = String(form.get("password"));
@@ -72,6 +84,8 @@ export function AuthForm({
           TOO_MANY_REQUESTS:
             "Çok fazla deneme yaptın. Bir dakika sonra tekrar dene.",
           PASSWORD_TOO_SHORT: "Şifren en az 10 karakter olmalı.",
+          EMAIL_SERVICE_UNAVAILABLE:
+            "Kayıt şu an kapalı: doğrulama e-postası gönderilemiyor.",
           INVALID_TOKEN:
             "Bu bağlantı geçersiz veya süresi dolmuş. Yeni bir bağlantı iste.",
         };
@@ -79,6 +93,8 @@ export function AuthForm({
           messages[result.error.code || ""] ||
             "İşlem tamamlanamadı. Bilgilerini kontrol edip tekrar dene.",
         );
+        if (result.error.code === "EMAIL_NOT_VERIFIED")
+          setUnverifiedEmail(email);
       } else if (mode === "forgot") {
         setSuccess(true);
         setMessage(
@@ -102,6 +118,18 @@ export function AuthForm({
       setPending(false);
     }
   }
+  async function resendVerification() {
+    setResend("sending");
+    try {
+      const result = await authClient.sendVerificationEmail({
+        email: unverifiedEmail,
+        callbackURL: "/",
+      });
+      setResend(result.error ? "failed" : "sent");
+    } catch {
+      setResend("failed");
+    }
+  }
   return (
     <div className="auth-wrap">
       <div className="auth-heading">
@@ -118,6 +146,13 @@ export function AuthForm({
         </p>
       </div>
       <div className="panel auth-panel">
+        {blocked && (
+          <p className="notice auth-unavailable" role="status">
+            {mode === "register"
+              ? "Kayıt şu an kapalı: doğrulama e-postası gönderilemiyor. Lütfen daha sonra tekrar dene."
+              : "Şifre yenileme e-postası şu an gönderilemiyor. Lütfen daha sonra tekrar dene."}
+          </p>
+        )}
         <form onSubmit={submit} className="form-stack">
           {mode === "register" && (
             <label className="field">
@@ -169,7 +204,9 @@ export function AuthForm({
           )}
           <button
             className="button button-dark"
-            disabled={!hydrated || pending || (mode === "reset" && !token)}
+            disabled={
+              !hydrated || pending || blocked || (mode === "reset" && !token)
+            }
           >
             {pending ? <LoaderCircle size={16} className="spin" /> : null}
             {pending
@@ -189,6 +226,33 @@ export function AuthForm({
             >
               {message}
             </p>
+          )}
+          {unverifiedEmail && !emailUnavailable && (
+            <div className="auth-resend">
+              {resend === "sent" ? (
+                <p className="form-message success" role="status">
+                  Doğrulama bağlantısı yeniden gönderildi. Gelen kutunu ve
+                  istenmeyen klasörünü kontrol et.
+                </p>
+              ) : (
+                <button
+                  type="button"
+                  className="button button-outline"
+                  onClick={resendVerification}
+                  disabled={resend === "sending"}
+                >
+                  {resend === "sending" && (
+                    <LoaderCircle size={15} className="spin" />
+                  )}
+                  Doğrulama e-postasını yeniden gönder
+                </button>
+              )}
+              {resend === "failed" && (
+                <p className="form-message error" role="alert">
+                  E-posta gönderilemedi. Birkaç dakika sonra tekrar dene.
+                </p>
+              )}
+            </div>
           )}
         </form>
         <p className="auth-switch">

@@ -4,6 +4,7 @@ export const reportTargetTypes = [
   "BOOK",
   "CHAPTER",
   "COMMENT",
+  "PROFILE_COMMENT",
   "USER",
 ] as const;
 export type ReportTargetType = (typeof reportTargetTypes)[number];
@@ -35,6 +36,7 @@ export const reasonsByTarget: Record<ReportTargetType, ReportReason[]> = {
   BOOK: [...common, "COPYRIGHT", "MISLEADING", "OTHER"],
   CHAPTER: [...common, "COPYRIGHT", "OTHER"],
   COMMENT: [...common, "SPOILER", "OTHER"],
+  PROFILE_COMMENT: [...common, "OTHER"],
   USER: ["IMPERSONATION", "INAPPROPRIATE_PROFILE", ...common, "OTHER"],
 };
 
@@ -42,6 +44,7 @@ export const reportTargetLabels: Record<ReportTargetType, string> = {
   BOOK: "Kitap",
   CHAPTER: "Bölüm",
   COMMENT: "Yorum",
+  PROFILE_COMMENT: "Profil yorumu",
   USER: "Kullanıcı",
 };
 

@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/session";
 import type { Actor } from "@/db/schema";
 import type { ActionState } from "@/lib/action-state";
 import { DomainError, requireReviewer } from "@/modules/publishing/policies";
+import { announcementBlocksInput } from "./announcement-content";
 import {
   saveAnnouncement,
   saveSlide,
@@ -23,6 +24,7 @@ async function run(
     await work(actor);
     revalidatePath("/");
     revalidatePath("/admin/duyurular");
+    revalidatePath("/duyurular", "layout");
     revalidatePath("/admin/slider");
     revalidatePath("/admin/islem-kaydi");
     return {
@@ -54,12 +56,34 @@ const common = (form: FormData) => ({
   published: form.get("published") === "on",
 });
 export async function saveAnnouncementAction(_: ActionState, form: FormData) {
-  return run((actor) =>
-    saveAnnouncement(getDb(), actor, {
-      ...common(form),
-      body: value(form, "body"),
-    }),
-  );
+  return run((actor) => {
+    let content: unknown;
+    try {
+      content = JSON.parse(value(form, "content"));
+    } catch {
+      throw new DomainError(
+        "CONTENT_INVALID",
+        "Duyuru içeriği okunamadı. Sayfayı yenileyip tekrar dene.",
+      );
+    }
+    const files = new Map<string, File>();
+    for (const [key, file] of form.entries())
+      if (
+        key.startsWith("announcement-image-") &&
+        file instanceof File &&
+        file.size
+      )
+        files.set(key.slice("announcement-image-".length), file);
+    return saveAnnouncement(
+      getDb(),
+      actor,
+      {
+        ...common(form),
+        content: announcementBlocksInput.parse(content),
+      },
+      files,
+    );
+  });
 }
 export async function saveSlideAction(_: ActionState, form: FormData) {
   const file = form.get("image");

@@ -627,6 +627,87 @@ img {
 .announcement-card h3 {
   font-size: 16px;
 }
+.announcements-page {
+  max-width: 850px;
+  margin: 0 auto;
+  padding-block: 32px;
+}
+.announcement-card h2 {
+  font-size: 21px;
+  margin-top: 10px;
+}
+.announcement-card time,
+.announcement-detail time {
+  color: var(--muted);
+  font-size: 13px;
+}
+.announcement-detail {
+  margin-top: 24px;
+  padding: clamp(20px, 4vw, 40px);
+  overflow-wrap: anywhere;
+}
+.announcement-body {
+  display: grid;
+  gap: 24px;
+  margin-bottom: 28px;
+  line-height: 1.85;
+}
+.announcement-body p {
+  white-space: pre-wrap;
+  margin: 0;
+}
+.announcement-body figure {
+  margin: 0;
+}
+.announcement-body img,
+.announcement-image-preview {
+  display: block;
+  max-width: 100%;
+  width: auto;
+  height: auto;
+  border-radius: 8px;
+}
+.announcement-fields {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.announcement-editor {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.announcement-editor small {
+  color: var(--muted);
+}
+.announcement-edit-block {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  min-width: 0;
+}
+.announcement-block-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  align-items: center;
+}
+.announcement-edit-block .button-row {
+  flex-wrap: wrap;
+}
+.announcement-edit-block textarea {
+  min-height: 150px;
+}
+.announcement-image-preview {
+  max-height: 350px;
+  object-fit: contain;
+}
+.announcement-card {
+  overflow-wrap: anywhere;
+}
 .announcement-card p {
   white-space: pre-wrap;
   font-size: 13px;
@@ -3200,6 +3281,47 @@ blockquote.report-details {
 .editor-content .tiptap p {
   margin-bottom: 1em;
 }
+/* Chapter illustrations: natural size when small, otherwise scaled down to
+   the reading column and at most ~70% of the screen height, ratio kept. */
+.chapter-inline-image {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: min(70vh, 640px);
+  object-fit: contain;
+  margin: 28px auto;
+  border-radius: 6px;
+}
+.editor-content .tiptap img.ProseMirror-selectednode {
+  outline: 3px solid var(--accent);
+  outline-offset: 4px;
+}
+.editor-image-help {
+  color: var(--muted);
+  font-size: 12px;
+  padding: 10px 15px;
+  border-inline: 1px solid var(--line);
+  margin: 0;
+}
+.editor-image-controls {
+  display: flex;
+  gap: 16px;
+  align-items: end;
+  flex-wrap: wrap;
+  padding: 12px 15px;
+  background: #222227;
+  border: 1px solid var(--line);
+}
+.editor-image-controls .field {
+  flex: 1;
+  min-width: 180px;
+}
+.editor-toolbar button:has(svg) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 .editor-content .tiptap p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   float: left;
@@ -4947,4 +5069,96 @@ html {
 }
 .premium-closed {
   margin-top: 12px;
+}
+/* Author profile: follow, follower count and profile comments. */
+.author-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-self: flex-start;
+}
+.follower-count {
+  color: var(--muted);
+  font-size: 13px;
+}
+.follower-count strong {
+  color: var(--ink);
+  font-size: 16px;
+}
+.follow-form .form-message.success {
+  /* The button label already reflects the new state; errors stay visible. */
+  display: none;
+}
+.author-actions .author-report {
+  align-self: center;
+}
+.profile-comments {
+  margin-top: 40px;
+  display: grid;
+  gap: 14px;
+}
+.profile-comments .section-heading {
+  margin-bottom: 4px;
+}
+.profile-comments h2 small {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+}
+.profile-comments-empty {
+  font-size: 13px;
+  padding: 10px 0;
+}
+.profile-comments .comment p {
+  white-space: pre-wrap;
+}
+.profile-comment-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+.profile-comment-actions .comment-report {
+  margin: 0;
+}
+.profile-comment-actions .button.report-trigger {
+  min-height: 0;
+  padding: 6px 2px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+.profile-comment-actions .button.report-trigger:hover {
+  color: #ff8394;
+}
+/* Author avatar beside the name on the book page. */
+.detail-author a {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+.detail-author .small-avatar {
+  width: 28px;
+  height: 28px;
+  font-size: 11px;
+}
+@media (max-width: 700px) {
+  .author-actions {
+    width: 100%;
+  }
+}
+/* Auth: email service state and resending verification. */
+.auth-unavailable {
+  margin-bottom: 18px;
+}
+.auth-resend {
+  display: grid;
+  gap: 10px;
+}
+.auth-resend .button {
+  width: 100%;
 }

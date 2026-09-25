@@ -23,7 +23,10 @@ import {
 import {
   getAnnouncements,
   getHomeSlides,
+  getAnnouncementArchive,
+  getPublishedAnnouncement,
 } from "@/modules/site-content/queries";
+import { readAnnouncementBlocks } from "@/modules/site-content/announcement-content";
 
 const png = () =>
   sharp({ create: { width: 20, height: 10, channels: 3, background: "red" } })
@@ -94,6 +97,220 @@ beforeEach(async () => {
 afterAll(close);
 
 describe("Duyuru ve slider yönetimi", () => {
+  it("arşiv tüm yayımlanan duyuruları sayfalar, ana sayfayı sınırlar ve taslak ayrıntısını gizler", async () => {
+    await db.announcement.createMany({
+      data: Array.from({ length: 55 }, (_, i) => ({
+        id: `archive-${i}`,
+        title: `Duyuru ${i}`,
+        body: `İçerik ${i}`,
+        position: i,
+        published: true,
+      })),
+    });
+    const draft = await saveAnnouncement(db, admin, announcement);
+    expect(await getPublishedAnnouncement(draft)).toBeNull();
+    expect(await getPublishedAnnouncement("missing")).toBeNull();
+    expect((await getAnnouncements()).map((item) => item.id)).toEqual([
+      "archive-0",
+      "archive-1",
+      "archive-2",
+    ]);
+    const archive = await getAnnouncementArchive(2);
+    expect(archive).toMatchObject({ total: 55, page: 2, pages: 5 });
+    expect(archive.rows).toHaveLength(12);
+    expect(archive.rows[0].id).toBe("archive-12");
+    expect(archive.rows[0]).not.toHaveProperty("content");
+    expect((await getAnnouncementArchive(999)).rows).toHaveLength(7);
+    expect((await getAnnouncementArchive(NaN)).page).toBe(1);
+    expect(await getPublishedAnnouncement("archive-54")).toMatchObject({
+      body: "İçerik 54",
+    });
+  });
+
+  it("metin arasına görsel kaydeder, sırasını ve dosyayı korur; kaldırırken medyayı temizler", async () => {
+    vi.mocked(uploadImage).mockClear();
+    vi.mocked(deleteImage).mockClear();
+    const file = new File([new Uint8Array(await png())], "image.png", {
+      type: "image/png",
+    });
+    const content = [
+      { type: "text" as const, id: "intro", text: "Giriş metni" },
+      { type: "image" as const, id: "photo", alt: "Etkinlik görseli" },
+      { type: "text" as const, id: "outro", text: "Son metin" },
+    ];
+    const id = await saveAnnouncement(
+      db,
+      admin,
+      { ...announcement, content, published: true },
+      new Map([["photo", file]]),
+    );
+    const row = await db.announcement.findUniqueOrThrow({ where: { id } });
+    const stored = readAnnouncementBlocks(row.content, row.body);
+    expect(stored.map((block) => block.type)).toEqual([
+      "text",
+      "image",
+      "text",
+    ]);
+    expect(row.body).toBe("Giriş metni\n\nSon metin");
+    const image = stored[1];
+    if (image.type !== "image") throw new Error("image missing");
+    expect(image).toMatchObject({
+      alt: "Etkinlik görseli",
+      width: 20,
+      height: 10,
+    });
+    expect(vi.mocked(uploadImage).mock.calls[0][1]).toBe("test/announcements");
+    expect(
+      (
+        await sharp(
+          Buffer.from(vi.mocked(uploadImage).mock.calls[0][0]),
+        ).metadata()
+      ).format,
+    ).toBe("webp");
+    await saveAnnouncement(db, admin, {
+      ...announcement,
+      id,
+      content: [content[1], content[2], content[0]],
+    });
+    const reordered = await db.announcement.findUniqueOrThrow({
+      where: { id },
+    });
+    expect(
+      readAnnouncementBlocks(reordered.content, reordered.body)[0],
+    ).toEqual(image);
+    expect(uploadImage).toHaveBeenCalledTimes(1);
+    expect(deleteImage).not.toHaveBeenCalledWith(image.publicId);
+    await saveAnnouncement(
+      db,
+      admin,
+      { ...announcement, id, content },
+      new Map([["photo", file]]),
+    );
+    expect(deleteImage).toHaveBeenCalledWith(image.publicId);
+    const replaced = await db.announcement.findUniqueOrThrow({ where: { id } });
+    const replacement = readAnnouncementBlocks(
+      replaced.content,
+      replaced.body,
+    )[1];
+    if (replacement.type !== "image") throw new Error("image missing");
+    await saveAnnouncement(db, admin, {
+      ...announcement,
+      id,
+      content: [content[0], content[2]],
+    });
+    expect(deleteImage).toHaveBeenCalledWith(replacement.publicId);
+    await saveAnnouncement(
+      db,
+      admin,
+      { ...announcement, id, content },
+      new Map([["photo", file]]),
+    );
+    const finalImage = (await vi.mocked(uploadImage).mock.results.at(-1)!.value)
+      .publicId;
+    await deleteSiteContent(db, admin, "announcement", id);
+    expect(deleteImage).toHaveBeenCalledWith(finalImage);
+  });
+
+  it("başarısız ve kısmi yüklemeleri temizler; başka duyurunun görselini veya istemci URL'sini kabul etmez", async () => {
+    vi.mocked(deleteImage).mockClear();
+    const file = new File([new Uint8Array(await png())], "image.png", {
+      type: "image/png",
+    });
+    const content = [
+      { type: "text" as const, id: "text", text: "Duyuru metni" },
+      { type: "image" as const, id: "photo", alt: "" },
+    ];
+    await expect(
+      saveAnnouncement(
+        db,
+        admin,
+        { ...announcement, id: "missing", content },
+        new Map([["photo", file]]),
+      ),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect(deleteImage).toHaveBeenCalledWith(
+      (await vi.mocked(uploadImage).mock.results.at(-1)!.value).publicId,
+    );
+    await saveAnnouncement(
+      db,
+      admin,
+      { ...announcement, content },
+      new Map([["photo", file]]),
+    );
+    await expect(
+      saveAnnouncement(db, admin, { ...announcement, content }),
+    ).rejects.toMatchObject({ code: "IMAGE_MISSING" });
+    const forged = [
+      ...content.slice(0, 1),
+      { ...content[1], url: "javascript:alert(1)", publicId: "another-image" },
+    ];
+    await expect(
+      saveAnnouncement(db, admin, { ...announcement, content: forged }),
+    ).rejects.toMatchObject({ code: "IMAGE_MISSING" });
+    await expect(
+      saveAnnouncement(
+        db,
+        admin,
+        {
+          ...announcement,
+          content: [...content, { type: "image", id: "broken", alt: "" }],
+        },
+        new Map([
+          ["photo", file],
+          ["broken", new File(["broken"], "bad.png")],
+        ]),
+      ),
+    ).rejects.toMatchObject({ code: "IMAGE_INVALID" });
+    expect(deleteImage).toHaveBeenCalledWith(
+      (await vi.mocked(uploadImage).mock.results.at(-1)!.value).publicId,
+    );
+    expect(await db.announcement.count()).toBe(1);
+  });
+
+  it("duyuru görsel yüklemelerini yetki ve boyut sınırlarıyla doğrular", async () => {
+    vi.mocked(uploadImage).mockClear();
+    const text = { type: "text" as const, id: "text", text: "Duyuru metni" };
+    const image = { type: "image" as const, id: "image", alt: "" };
+    const content = [text, image];
+    await expect(
+      saveAnnouncement(
+        db,
+        reader,
+        { ...announcement, content },
+        new Map([["image", new File(["data"], "x.png")]]),
+      ),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(
+      saveAnnouncement(
+        db,
+        admin,
+        { ...announcement, content },
+        new Map([
+          ["image", new File([new Uint8Array(3 * 1024 * 1024 + 1)], "x.png")],
+        ]),
+      ),
+    ).rejects.toMatchObject({ code: "IMAGE_SIZE" });
+    await expect(
+      saveAnnouncement(db, admin, {
+        ...announcement,
+        content: [
+          text,
+          ...Array.from({ length: 9 }, (_, i) => ({
+            ...image,
+            id: `image-${i}`,
+          })),
+        ],
+      }),
+    ).rejects.toThrow();
+    await expect(
+      saveAnnouncement(db, admin, { ...announcement, content: [text, text] }),
+    ).rejects.toThrow();
+    await expect(
+      saveAnnouncement(db, admin, { ...announcement, content: [image] }),
+    ).rejects.toThrow();
+    expect(uploadImage).not.toHaveBeenCalled();
+  });
+
   it("otomatik katalog sayfalarını bir kez düzenlenebilir slaytlara taşır", async () => {
     const sql = await readFile(
       "prisma/migrations/20260926000000_managed_home_slides/migration.sql",

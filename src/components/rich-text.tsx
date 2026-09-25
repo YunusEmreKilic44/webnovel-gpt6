@@ -1,5 +1,10 @@
 import type { JSONContent } from "@tiptap/react";
 import { Fragment, type ReactNode } from "react";
+import Image from "next/image";
+import {
+  chapterImageNode,
+  chapterImageUrl,
+} from "@/modules/publishing/image-content";
 export function RichText({ content }: { content: JSONContent }) {
   function render(node: JSONContent, key: number): ReactNode {
     const children = node.content?.map(render);
@@ -14,6 +19,22 @@ export function RichText({ content }: { content: JSONContent }) {
       return <Fragment key={key}>{text}</Fragment>;
     }
     switch (node.type) {
+      case "image": {
+        const image = chapterImageNode.safeParse(node);
+        if (!image.success) return null;
+        // The optimizer must not cache authenticated media or strip session cookies.
+        return (
+          <Image
+            key={key}
+            src={chapterImageUrl(image.data.attrs.imageId)}
+            alt={image.data.attrs.alt}
+            width={1200}
+            height={800}
+            unoptimized
+            className="chapter-inline-image"
+          />
+        );
+      }
       case "paragraph":
         return <p key={key}>{children || <br />}</p>;
       case "heading":

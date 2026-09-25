@@ -12,6 +12,14 @@ import Placeholder from "@tiptap/extension-placeholder";
 import { saveChapterAction } from "@/modules/publishing/actions";
 import { initialActionState } from "@/lib/action-state";
 import { wordCount } from "@/modules/publishing/content";
+import {
+  chapterImageIds,
+  chapterImageUrl,
+  MAX_CHAPTER_IMAGES,
+  MAX_CHAPTER_UPLOAD_BYTES,
+} from "@/modules/publishing/image-content";
+import { createChapterImageExtension } from "./chapter-image-extension";
+import { acceptedImageTypes } from "./use-image-pick";
 import { Check, LoaderCircle } from "./icons";
 import {
   Bold,
@@ -21,6 +29,8 @@ import {
   List,
   Undo2,
   Redo2,
+  ImagePlus,
+  Trash2,
 } from "lucide-react";
 
 export function ChapterEditor({
@@ -37,6 +47,16 @@ export function ChapterEditor({
   const [version, setVersion] = useState(chapter.version);
   const changes = useRef(0);
   const inFlight = useRef(false);
+  const imageInput = useRef<HTMLInputElement>(null);
+  const imagePosition = useRef<number | null>(null);
+  const [localImages] = useState(
+    () => new Map<string, { file: File; url: string; saved: boolean }>(),
+  );
+  const [imageError, setImageError] = useState("");
+  const [selectedImage, setSelectedImage] = useState<{
+    imageId: string;
+    alt: string;
+  } | null>(null);
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -46,6 +66,13 @@ export function ChapterEditor({
         underline: false,
       }),
       Placeholder.configure({ placeholder: "Her şey bir satırla başlar…" }),
+      createChapterImageExtension(
+        (id) => localImages.get(id)?.url ?? chapterImageUrl(id),
+        () =>
+          setImageError(
+            `Bir bölüme en fazla ${MAX_CHAPTER_IMAGES} resim ekleyebilirsin.`,
+          ),
+      ),
     ],
     content: chapter.content,
     immediatelyRender: false,
@@ -62,7 +89,23 @@ export function ChapterEditor({
       setDirty(true);
       setError("");
     },
+    onSelectionUpdate: ({ editor }) => {
+      setSelectedImage(
+        editor.isActive("image")
+          ? {
+              imageId: editor.getAttributes("image").imageId,
+              alt: editor.getAttributes("image").alt ?? "",
+            }
+          : null,
+      );
+    },
   });
+  useEffect(() => {
+    const images = localImages;
+    return () => {
+      for (const image of images.values()) URL.revokeObjectURL(image.url);
+    };
+  }, [localImages]);
   const save = useCallback(async () => {
     if (inFlight.current || !dirty || title.trim().length < 2 || error) return;
     inFlight.current = true;
@@ -73,9 +116,21 @@ export function ChapterEditor({
     form.set("title", title);
     form.set("content", JSON.stringify(content));
     form.set("version", String(version));
+    const includedImages: string[] = [];
+    for (const id of new Set(chapterImageIds(content))) {
+      const image = localImages.get(id);
+      if (image && !image.saved) {
+        form.set(`chapter-image-${id}`, image.file);
+        includedImages.push(id);
+      }
+    }
     try {
       const result = await saveChapterAction(initialActionState, form);
       if (result.ok && result.version) {
+        for (const id of includedImages) {
+          const image = localImages.get(id);
+          if (image) image.saved = true;
+        }
         setVersion(result.version);
         setMessage("Taslak kaydedildi.");
         if (changes.current === revisionAtSave) setDirty(false);
@@ -88,7 +143,7 @@ export function ChapterEditor({
       inFlight.current = false;
       setPending(false);
     }
-  }, [chapter.id, content, dirty, error, title, version]);
+  }, [chapter.id, content, dirty, error, title, version, localImages]);
   useEffect(() => {
     if (!dirty || pending || error) return;
     const timer = setTimeout(() => {
@@ -129,6 +184,22 @@ export function ChapterEditor({
         />
       </label>
       <div className="editor-toolbar">
+        <button
+          type="button"
+          aria-label="Resim ekle"
+          title="İmleç konumuna resim ekle (isteğe bağlı)"
+          disabled={
+            !editor || chapterImageIds(content).length >= MAX_CHAPTER_IMAGES
+          }
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => {
+            if (!editor) return;
+            imagePosition.current = editor.state.selection.from;
+            imageInput.current?.click();
+          }}
+        >
+          <ImagePlus size={16} /> Resim ekle
+        </button>
         <button
           type="button"
           onClick={() => editor?.chain().focus().toggleBold().run()}
@@ -190,6 +261,101 @@ export function ChapterEditor({
         </button>
         <span className="editor-word-count">{wordCount(content)} kelime</span>
       </div>
+      <input
+        ref={imageInput}
+        type="file"
+        accept={acceptedImageTypes}
+        className="sr-only"
+        tabIndex={-1}
+        aria-label="Bölüme eklenecek resim"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.target.value = "";
+          if (!file || !editor) return;
+          setImageError("");
+          if (
+            !acceptedImageTypes.split(",").includes(file.type) ||
+            file.size > 3 * 1024 * 1024 ||
+            !file.size
+          ) {
+            setImageError(
+              "En fazla 3 MB boyutunda bir JPG, PNG veya WebP resmi seç.",
+            );
+            return;
+          }
+          const ids = chapterImageIds(editor.getJSON());
+          if (ids.length >= MAX_CHAPTER_IMAGES) {
+            setImageError(
+              `Bir bölüme en fazla ${MAX_CHAPTER_IMAGES} resim ekleyebilirsin.`,
+            );
+            return;
+          }
+          const pendingBytes = [...new Set(ids)].reduce((sum, id) => {
+            const image = localImages.get(id);
+            return sum + (image && !image.saved ? image.file.size : 0);
+          }, 0);
+          if (pendingBytes + file.size > MAX_CHAPTER_UPLOAD_BYTES) {
+            setImageError(
+              "Bir bölüme en fazla 3 MB boyutunda tek resim yükleyebilirsin.",
+            );
+            return;
+          }
+          const imageId = crypto.randomUUID();
+          const url = URL.createObjectURL(file);
+          localImages.set(imageId, { file, url, saved: false });
+          const at = Math.min(
+            imagePosition.current ?? editor.state.selection.from,
+            editor.state.doc.content.size,
+          );
+          const inserted = editor
+            .chain()
+            .focus()
+            .insertContentAt(at, { type: "image", attrs: { imageId, alt: "" } })
+            .run();
+          if (!inserted) {
+            URL.revokeObjectURL(url);
+            localImages.delete(imageId);
+            setImageError(
+              "Resim eklenemedi. Metinde başka bir konum seçip tekrar dene.",
+            );
+          }
+        }}
+      />
+      <p className="editor-image-help">
+        Bölüm başına en fazla 1 resim ekleyebilirsin; resim isteğe bağlıdır ve
+        taslakla kaydedilir. JPG, PNG veya WebP · En fazla 3 MB.
+      </p>
+      {imageError && (
+        <p role="alert" className="form-message error">
+          {imageError}
+        </p>
+      )}
+      {selectedImage && (
+        <div className="editor-image-controls">
+          <label className="field">
+            Resim açıklaması (erişilebilirlik)
+            <input
+              maxLength={200}
+              value={selectedImage.alt}
+              onChange={(event) => {
+                const alt = event.target.value;
+                setSelectedImage({ ...selectedImage, alt });
+                editor?.commands.updateAttributes("image", { alt });
+              }}
+            />
+          </label>
+          <button
+            type="button"
+            className="button button-outline button-small"
+            onClick={() => {
+              editor?.chain().focus().deleteSelection().run();
+              setSelectedImage(null);
+            }}
+          >
+            <Trash2 size={14} /> Resmi kaldır
+          </button>
+        </div>
+      )}
       <EditorContent editor={editor} className="editor-content" />
       <div className="editor-actions">
         <div className="editor-footer" role="status">

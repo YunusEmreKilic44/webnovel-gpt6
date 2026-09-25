@@ -5,27 +5,16 @@ import { getDb } from "@/db";
 import { isLocalPreview } from "./auth-preview";
 import { assertSessionAllowed } from "./ban-policy";
 export { isLocalPreview } from "./auth-preview";
-async function sendEmail(to: string, subject: string, url: string) {
-  if (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM)
-    throw new Error("E-posta servisi henüz yapılandırılmadı.");
-  const result = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from: process.env.EMAIL_FROM,
-      to,
-      subject,
-      text: `${subject}\n\n${url}\n\nBu işlemi sen başlatmadıysan bu e-postayı yok sayabilirsin.`,
-    }),
-  });
-  if (!result.ok) throw new Error("E-posta gönderilemedi.");
+import { APIError } from "better-auth/api";
+import { isEmailConfigured, sendEmail } from "./email";
+/** Accounts must verify their email unless this is local development. */
+export function emailVerificationRequired() {
+  return !(
+    isLocalPreview() && process.env.DEV_SKIP_EMAIL_VERIFICATION === "true"
+  );
 }
 function createAuth() {
-  const skipVerification =
-    isLocalPreview() && process.env.DEV_SKIP_EMAIL_VERIFICATION === "true";
+  const skipVerification = !emailVerificationRequired();
   if (
     !process.env.BETTER_AUTH_SECRET ||
     process.env.BETTER_AUTH_SECRET.length < 32
@@ -69,9 +58,16 @@ function createAuth() {
       },
       user: {
         create: {
-          before: async (value) => ({
-            data: { ...value, emailVerified: skipVerification },
-          }),
+          before: async (value) => {
+            // Refuse accounts that could never be verified (no email service).
+            if (!skipVerification && !isEmailConfigured())
+              throw new APIError("SERVICE_UNAVAILABLE", {
+                message:
+                  "Kayıt şu an kapalı: doğrulama e-postası gönderilemiyor.",
+                code: "EMAIL_SERVICE_UNAVAILABLE",
+              });
+            return { data: { ...value, emailVerified: skipVerification } };
+          },
         },
       },
     },

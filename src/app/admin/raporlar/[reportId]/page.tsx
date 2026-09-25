@@ -46,6 +46,7 @@ async function ReportDetail({ params }: Props) {
             BOOK: "Kitabı gizle",
             CHAPTER: "Bölümü gizle",
             COMMENT: "Yorumu gizle",
+            PROFILE_COMMENT: "Profil yorumunu gizle",
           }[type],
         };
   return (
@@ -276,6 +277,33 @@ function ReportTargetPreview({
           {comment.spoiler && " · Spoiler işaretli"}
         </p>
         <blockquote className="report-details">{comment.body}</blockquote>
+      </div>
+    );
+  }
+  if (target.type === "PROFILE_COMMENT") {
+    const { profileComment } = target;
+    return (
+      <div className="report-target">
+        <p>
+          <Link
+            className="text-link"
+            href={`/admin/kullanicilar/${profileComment.author.id}`}
+          >
+            {profileComment.author.name}
+          </Link>
+          {" → "}
+          <Link
+            className="text-link"
+            href={`/yazar/${profileComment.profileUser.id}`}
+          >
+            {profileComment.profileUser.name} profili
+          </Link>{" "}
+          · {fullDate(profileComment.createdAt)}
+          {profileComment.hidden && " · Gizli"}
+        </p>
+        <blockquote className="report-details">
+          {profileComment.body}
+        </blockquote>
       </div>
     );
   }

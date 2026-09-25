@@ -22,11 +22,11 @@ async function Announcements() {
     <>
       <AdminHeading
         title="Duyurular"
-        description="Ana sayfadaki duyuruları ekle, düzenle ve yayına al. Yayımla işareti kapalı kayıtlar yalnızca burada görünür."
+        description="Duyuruları metin ve görsellerle hazırla, sırala ve yayımla. Taslaklar yalnızca burada; yayımlanan duyurular duyuru arşivinde görünür. Ana sayfada ilk üç duyuru özetlenir."
       />
       <p className="content-page-link">
-        <Link className="text-link" href="/">
-          Ana sayfayı görüntüle →
+        <Link className="text-link" href="/duyurular">
+          Tüm duyuruları görüntüle →
         </Link>
       </p>
       <div className="stack">
@@ -46,6 +46,11 @@ async function Announcements() {
               </span>
             </summary>
             <AnnouncementForm item={item} />
+            {item.published && (
+              <Link className="text-link" href={`/duyurular/${item.id}`}>
+                Duyuruyu oku →
+              </Link>
+            )}
             <DeleteContentForm kind="announcement" id={item.id} />
           </details>
         ))}

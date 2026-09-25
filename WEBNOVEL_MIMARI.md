@@ -24,6 +24,22 @@ Bu doküman çalışan sürümü ve platformun hedef mimarisini birlikte tanıml
 
 Mevcut kullanıcı rolleri `reader` ve `admin` değerleridir; yazarlık kitap sahipliğiyle belirlenir. Aşağıdaki ayrıntılı rol, ödeme ve operasyon bölümleri ileride uygulanacak daha geniş modeli de içerir. Belirtilmeyen ürün davranışları **önerilen ürün kararı** olarak tasarlanmıştır.
 
+### Duyuru içeriği ve medya
+
+- `Announcement.content`, sıralı `text` ve `image` bloklarını JSONB olarak saklar. `body`, aynı kayıtta sunucunun ürettiği düz metin izdüşümüdür; liste özetleri görselleri/editör verisini yüklemez. Eski düz metin kayıtları migration ile kayıpsız taşınır; okuyucu ve editör null içerik için düz metne geri dönebilir.
+- `/duyurular` arşivi 12 kayıtlık sayfalama, `/duyurular/[id]` tam içerik sunar. Her iki okuyucu sorgusu da `published = true` koşulu uygular; taslak/eksik ayrıntılar bulunamadı sayfası verir. Ana sayfa ilk üç kaydı özetler. Sıra, oluşturulma tarihi ve kimlik birlikte kararlı sıralama sağlar; eski 50 kayıt sınırı kaldırılmıştır.
+- Yönetici içerik bloklarının sırasını ve görsellerin açıklamasını gönderir; URL ve Cloudinary silme kimliği istemciden kabul edilmez. Korunan görseller aynı duyurunun önceki içeriğinden, yeni görseller doğrulanıp yeniden kodlanan yüklemeden alınır. Ham HTML render edilmez.
+- Yüklemeler transaction dışında yapılır; içerik ve denetim kaydı aynı yetki kontrollü transaction içinde yazılır. Başarısız işlemde yeni yüklemeler, başarılı değiştirme/silmede artık kullanılmayan görseller temizlenir. Cloudinary silme hataları mevcut medya altyapısındaki gibi loglanır. Görseller zorunlu değildir; en fazla 8 adet, dosya başına 3 MB ve istek toplamı 12 MB sınırı vardır. Server Action gövde limiti multipart ek yükü için 16 MB'dir.
+- Bölüm editörü/okuyucusunun metin şeması bu özellikten bağımsızdır. Duyuruların doğrulaması `modules/site-content/announcement-content.ts`, yükleme ve kayıt yaşam döngüsü `modules/site-content/service.ts` içindedir.
+
+### Bölüm içi görseller
+
+- Tiptap belgesi isteğe bağlı `image` blokları taşır. Blok yalnız sunucuda doğrulanan `imageId` ve erişilebilirlik açıklaması içerir; harici URL, HTML veya base64 veri kabul edilmez. Görsel metin blokları arasına eklenir, kelime sayısını ve minimum yayın metni şartını değiştirmez.
+- Editör dosyayı yerel object URL ile hemen gösterir, otomatik taslak kaydına dosyayı ekler. Sunucu JPG/PNG/WebP dosyasını doğrular, metadata'yı temizleyip en fazla 2000×2400 WebP'ye dönüştürür. Bölüm başına en fazla 1 resim ve 3 MB yükleme sınırı hem editörde hem sunucuda uygulanır; resim zorunlu değildir.
+- Bölüm medyası `chapter_images` tablosunda ayrı, değişmez BYTEA kayıtlarıdır; metin sorguları ve JSON sürümlerine ikili veri eklenmez. Kimlik aynı bölümde saklanmış bir görsele veya o kayıtta yüklenen dosyaya ait olmalıdır. Bölüm güncellemesi, yeni görseller ve sürüm geçmişi aynı transaction'da tutulur; sürüm çakışması veya eksik görsel hepsini geri alır.
+- Taslak görselini kaldırmak yayımlanan sürümün veya inceleme anlık görüntüsünün görselini silmez. Kaydedilmiş görseller sürüm geçmişi için korunur; bölüm fiziksel olarak silinirse FK cascade ile temizlenir. Kaydedilmeden kaldırılan bir görsel sunucuya gönderilmez.
+- Bölüm resimleri herkese açık Cloudinary adresleri yerine `/api/chapter-images/[id]` üzerinden sunulur. Baytları döndüren sorgu yazar/doğrulanmış yönetici yetkisini veya görünür yayımlanmış bölüm + ücretsiz/satın alınmış erişim + yayımlanan belgede görsel referansını birlikte kontrol eder. Taslak/ücretli içerik doğrudan resim adresiyle açılamaz; yanıtlarda `private, no-store` kullanılır ve Next Image ortak optimizasyon önbelleği devre dışıdır.
+
 ## 1. Ürün ve başlangıç kararları
 
 Platformda kullanıcılar kitap yazar, kitaplarını ciltlere (volume) ve bölümlere (chapter) ayırır. Kitaplar yayın başvurusu onaylandıktan sonra okuyucuya açılır. Okuyucular kitaplara 1–5 puan verir ve yorum yazar. Yazarlar ayrıca kitap bazında premium başvurusu yapar. Premium onayı, uygun bölümleri ücretli sunma yetkisi sağlar; her bölümün ücretli olması zorunlu değildir.

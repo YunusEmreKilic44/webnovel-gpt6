@@ -6,7 +6,16 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { NavProgress } from "./nav-progress";
 import { useHydrated } from "@/lib/use-hydrated";
-import { BookOpen, Coins, Feather, Library, Menu, Search, X } from "./icons";
+import {
+  Bell,
+  BookOpen,
+  Coins,
+  Feather,
+  Library,
+  Menu,
+  Search,
+  X,
+} from "./icons";
 
 /** Coin store link; the server only renders it while the store is open. */
 export function StoreNavLink({ mobile = false }: { mobile?: boolean }) {
@@ -90,6 +99,12 @@ export function Shell({
       </>
     );
   const links = [
+    {
+      href: "/duyurular",
+      label: "Duyurular",
+      icon: Bell,
+      active: pathname === "/duyurular" || pathname.startsWith("/duyurular/"),
+    },
     {
       href: "/kesfet",
       label: "Webnoveller",

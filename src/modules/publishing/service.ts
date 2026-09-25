@@ -4,6 +4,7 @@ import type { Database } from "@/db";
 import type { Prisma } from "@/generated/prisma/client";
 import type { Actor, ApplicationSnapshot } from "@/db/schema";
 import { emptyContent, parseContent, wordCount } from "./content";
+import { prepareChapterImages, saveChapterImages } from "./images";
 import {
   DomainError,
   requireOwner,
@@ -22,6 +23,7 @@ import { prepareImage } from "@/lib/image-upload";
 import { coverPresets } from "@/lib/covers";
 import {
   notifyApplicationReviewed,
+  notifyFollowersOfNewBook,
   notifyNewChapter,
 } from "@/modules/notifications/service";
 import { getPremiumProgress } from "@/modules/premium/requirements";
@@ -316,10 +318,21 @@ export async function saveChapter(
     rawContent: string;
     expectedVersion: number;
   },
+  files: Map<string, File> = new Map(),
 ) {
   requireVerified(actor);
   const title = titleInput.parse(input.title);
   const content = parseContent(input.rawContent);
+  // Reject unauthorized uploads before decoding any image bytes.
+  if (files.size) {
+    const chapter = await db.chapter.findUnique({
+      where: { id: input.chapterId },
+      select: { book: { select: { authorId: true } } },
+    });
+    if (!chapter) throw new DomainError("NOT_FOUND", "Bölüm bulunamadı.");
+    requireOwner(actor, chapter.book);
+  }
+  const images = await prepareChapterImages(content, files);
   return db.$transaction(async (tx) => {
     const book = await chapterBook(tx, input.chapterId);
     requireOwner(actor, book);
@@ -339,6 +352,7 @@ export async function saveChapter(
         "REVISION_CONFLICT",
         "Bu bölüm başka bir sekmede değiştirildi. Metnini kopyalayıp sayfayı yenile.",
       );
+    await saveChapterImages(tx, input.chapterId, content, images);
     await tx.chapterRevision.create({
       data: {
         id: id(),
@@ -526,6 +540,7 @@ export async function reviewApplication(
           where: { id: book.id },
           data: { status: "PUBLISHED", updatedAt: publishedAt },
         });
+        await notifyFollowersOfNewBook(tx, book);
       } else {
         if (book.status !== "PUBLISHED")
           throw new DomainError("NOT_PUBLISHED", "Kitap yayında olmalı.");
@@ -636,6 +651,8 @@ export async function publishChapter(
       where: { id: book.id },
       data: { status: "PUBLISHED", updatedAt: new Date() },
     });
+    // An approved book goes public with its first chapter: tell followers.
+    if (book.status !== "PUBLISHED") await notifyFollowersOfNewBook(tx, book);
     // Only a chapter's first publication is news; republishing an edit is not.
     if (!chapter.firstPublishedAt)
       await notifyNewChapter(

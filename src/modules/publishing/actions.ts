@@ -119,12 +119,21 @@ export async function addChapterAction(_: ActionState, form: FormData) {
 }
 export async function saveChapterAction(_: ActionState, form: FormData) {
   return run(async (actor) => {
-    const version = await service.saveChapter(getDb(), actor, {
-      chapterId: value(form, "chapterId"),
-      title: value(form, "title"),
-      rawContent: value(form, "content"),
-      expectedVersion: Number(form.get("version")),
-    });
+    const files = new Map<string, File>();
+    for (const [key, file] of form.entries())
+      if (key.startsWith("chapter-image-") && file instanceof File && file.size)
+        files.set(key.slice("chapter-image-".length), file);
+    const version = await service.saveChapter(
+      getDb(),
+      actor,
+      {
+        chapterId: value(form, "chapterId"),
+        title: value(form, "title"),
+        rawContent: value(form, "content"),
+        expectedVersion: Number(form.get("version")),
+      },
+      files,
+    );
     return { message: "Taslak kaydedildi.", version };
   });
 }

@@ -11,6 +11,8 @@ model Announcement {
   id        String   @id
   title     String
   body      String
+  /// Ordered text/image blocks. body is the searchable plain-text projection.
+  content   Json?
   linkPath  String   @default("") @map("link_path")
   linkLabel String   @default("") @map("link_label")
   published Boolean  @default(false)
@@ -187,6 +189,7 @@ model Chapter {
   volume             Volume            @relation("ChapterVolume", fields: [volumeId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "chapters_volume_id_volumes_id_fk")
   volumeBook         Volume            @relation("ChapterVolumeBook", fields: [volumeId, bookId], references: [id, bookId], onDelete: NoAction, onUpdate: NoAction, map: "chapter_volume_book_fk")
   chapterRevisions   ChapterRevision[]
+  images             ChapterImage[]
   readingProgress    ReadingProgress[]
   reads              ChapterRead[]
   unlocks            ChapterUnlock[]
@@ -197,6 +200,18 @@ model Chapter {
   @@unique([volumeId, position], map: "chapters_position_idx")
   @@index([bookId, status], map: "chapters_book_idx")
   @@map("chapters")
+}
+
+/// Private chapter media. Immutable so published/reviewed revisions keep their images.
+model ChapterImage {
+  id        String   @id
+  chapterId String   @map("chapter_id")
+  imageData Bytes    @map("image_data")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  chapter   Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  @@index([chapterId])
+  @@map("chapter_images")
 }
 
 model ChapterRead {
@@ -337,6 +352,11 @@ model User {
 
   reportsFiled   Report[] @relation("ReportReporter")
   reportsHandled Report[] @relation("ReportHandler")
+
+  following              AuthorFollow[]   @relation("Follower")
+  followers              AuthorFollow[]   @relation("FollowedAuthor")
+  profileComments        ProfileComment[] @relation("ProfileOwner")
+  writtenProfileComments ProfileComment[] @relation("ProfileCommenter")
 
   @@unique([email], map: "user_email_unique")
   @@map("user")
@@ -503,4 +523,32 @@ model Report {
   @@index([status, createdAt])
   @@index([targetType, targetId])
   @@map("reports")
+}
+
+/// A reader following an author (to hear about new books).
+model AuthorFollow {
+  followerId String   @map("follower_id")
+  authorId   String   @map("author_id")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  follower   User     @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  author     User     @relation("FollowedAuthor", fields: [authorId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([followerId, authorId])
+  @@index([authorId])
+  @@map("author_follows")
+}
+
+/// A comment on a user's public profile page.
+model ProfileComment {
+  id            String   @id
+  profileUserId String   @map("profile_user_id")
+  authorId      String   @map("author_id")
+  body          String
+  hidden        Boolean  @default(false)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  profileUser   User     @relation("ProfileOwner", fields: [profileUserId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  author        User     @relation("ProfileCommenter", fields: [authorId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([profileUserId, createdAt])
+  @@map("profile_comments")
 }

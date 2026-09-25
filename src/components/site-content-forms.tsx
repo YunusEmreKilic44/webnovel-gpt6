@@ -1,7 +1,8 @@
 import { ActionForm, SubmitButton } from "./action-form";
 import { SlideImageField } from "./slide-image-field";
+import { AnnouncementEditorForm } from "./announcement-editor";
+import { readAnnouncementBlocks } from "@/modules/site-content/announcement-content";
 import {
-  saveAnnouncementAction,
   saveSlideAction,
   deleteContentAction,
 } from "@/modules/site-content/actions";
@@ -28,9 +29,11 @@ type Common = {
 function CommonFields({
   item,
   defaultPosition = 0,
+  publishLabel = "Ana sayfada yayımla",
 }: {
   item?: Common;
   defaultPosition?: number;
+  publishLabel?: string;
 }) {
   return (
     <>
@@ -83,7 +86,7 @@ function CommonFields({
             type="checkbox"
             defaultChecked={item?.published ?? false}
           />
-          Ana sayfada yayımla
+          {publishLabel}
         </label>
       </div>
     </>
@@ -92,23 +95,15 @@ function CommonFields({
 export function AnnouncementForm({
   item,
 }: {
-  item?: Common & { body: string };
+  item?: Common & { body: string; content: unknown };
 }) {
   return (
-    <ActionForm action={saveAnnouncementAction} className="form-stack">
-      <CommonFields item={item} />
-      <label className="field">
-        Duyuru metni
-        <textarea
-          name="body"
-          required
-          minLength={3}
-          maxLength={2000}
-          defaultValue={item?.body}
-        />
-      </label>
-      <SubmitButton>{item ? "Duyuruyu kaydet" : "Duyuru ekle"}</SubmitButton>
-    </ActionForm>
+    <AnnouncementEditorForm
+      blocks={readAnnouncementBlocks(item?.content, item?.body ?? "")}
+      editing={Boolean(item)}
+    >
+      <CommonFields item={item} publishLabel="Duyuruyu yayımla" />
+    </AnnouncementEditorForm>
   );
 }
 export function SlideForm({
@@ -171,8 +166,8 @@ export function DeleteContentForm({
         {kind === "slide" ? "Sayfayı sil" : "Kaydı sil"}
       </summary>
       <p>
-        Bu kayıt kalıcı olarak silinecek. Yalnızca gizlemek için “Ana sayfada
-        yayımla” işaretini kaldırıp kaydet.
+        Bu kayıt kalıcı olarak silinecek. Yalnızca gizlemek için yayımlama
+        işaretini kaldırıp kaydet.
       </p>
       <ActionForm action={deleteContentAction}>
         <input type="hidden" name="id" value={id} />

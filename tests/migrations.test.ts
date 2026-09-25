@@ -4,6 +4,49 @@ import { migrateLocal, migrationFiles } from "./support/migrate";
 import { createLocalDatabase } from "./support/database";
 
 describe("Prisma SQL migration'ları", () => {
+  it("eski duyuruları satır sonları ve bağlantılarıyla blok içeriğine taşır", async () => {
+    const client = new PGlite();
+    const { db, close } = createLocalDatabase(client);
+    try {
+      const migrations = await migrationFiles();
+      const index = migrations.findIndex(
+        (migration) => migration.name === "20261003000000_announcement_content",
+      );
+      expect(index).toBeGreaterThan(0);
+      for (const migration of migrations.slice(0, index))
+        await client.exec(migration.sql);
+      await client.query(
+        "INSERT INTO announcements (id, title, body, published, link_path, link_label) VALUES ($1, $2, $3, true, $4, $5)",
+        [
+          "legacy-announcement",
+          "Eski duyuru",
+          "İlk satır\n\nSon satır <etiket>",
+          "/kesfet",
+          "Keşfet",
+        ],
+      );
+      await client.exec(migrations[index].sql);
+      expect(
+        await db.announcement.findUniqueOrThrow({
+          where: { id: "legacy-announcement" },
+        }),
+      ).toMatchObject({
+        body: "İlk satır\n\nSon satır <etiket>",
+        published: true,
+        linkPath: "/kesfet",
+        linkLabel: "Keşfet",
+        content: [
+          {
+            type: "text",
+            id: "legacy-text",
+            text: "İlk satır\n\nSon satır <etiket>",
+          },
+        ],
+      });
+    } finally {
+      await close();
+    }
+  });
   it("etiket tablolarını ekler ve kaldırılan kategoriyi kitabı kategorisiz bırakmadan temizler", async () => {
     const client = new PGlite();
     const { db, close } = createLocalDatabase(client);

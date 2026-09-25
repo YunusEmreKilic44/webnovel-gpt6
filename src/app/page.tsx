@@ -5,6 +5,7 @@ import {
   HeroSkeleton,
 } from "@/components/loading-skeletons";
 import Link from "next/link";
+import { announcementExcerpt } from "@/modules/site-content/announcement-content";
 import { getCatalog } from "@/modules/catalog/queries";
 import { BookCard } from "@/components/book-card";
 import { BookCover } from "@/components/book-cover";
@@ -122,15 +123,18 @@ async function HomeAnnouncements() {
   return (
     <section className="home-announcements" aria-label="Duyurular">
       <h2>Duyurular</h2>
+      <Link className="text-link" href="/duyurular">
+        Tüm duyurular →
+      </Link>
       {announcements.map((item) => (
         <article className="announcement-card" key={item.id}>
-          <h3>{item.title}</h3>
-          <p>{item.body}</p>
-          {item.linkPath && (
-            <Link className="text-link" href={item.linkPath}>
-              {item.linkLabel} <ArrowRight size={15} />
-            </Link>
-          )}
+          <h3>
+            <Link href={`/duyurular/${item.id}`}>{item.title}</Link>
+          </h3>
+          <p>{announcementExcerpt(item.body)}</p>
+          <Link className="text-link" href={`/duyurular/${item.id}`}>
+            Duyuruyu oku <ArrowRight size={15} />
+          </Link>
         </article>
       ))}
     </section>

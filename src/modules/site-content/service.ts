@@ -6,6 +6,13 @@ import { administrativeWrite, audit } from "@/modules/admin/service";
 import { DomainError, requireReviewer } from "@/modules/publishing/policies";
 import { deleteImage, mediaFolder, uploadImage } from "@/lib/cloudinary";
 import { prepareImage } from "@/lib/image-upload";
+import {
+  announcementBlocksInput,
+  announcementText,
+  readAnnouncementBlocks,
+  MAX_ANNOUNCEMENT_UPLOAD_BYTES,
+  type AnnouncementBlock,
+} from "./announcement-content";
 
 export const imagePresets = [
   "hero",
@@ -45,7 +52,9 @@ export const announcementInput = common
       .string()
       .trim()
       .min(3, "Duyuru metni en az 3 karakter olmalı.")
-      .max(2000),
+      .max(20000)
+      .optional(),
+    content: announcementBlocksInput.optional(),
   })
   .refine(validLink, linkError);
 export const slideInput = common
@@ -64,48 +73,112 @@ export async function saveAnnouncement(
   db: Database,
   actor: Actor,
   raw: z.input<typeof announcementInput>,
+  files: Map<string, File> = new Map(),
 ) {
-  const { id, ...data } = announcementInput.parse(raw);
-  return administrativeWrite(db, actor, async (tx) => {
-    const before = id
-      ? await tx.announcement.findUnique({ where: { id } })
-      : null;
-    if (id && !before) throw new DomainError("NOT_FOUND", "Duyuru bulunamadı.");
-    if (!id && (await tx.announcement.count()) >= 50)
-      throw new DomainError(
-        "LIMIT",
-        "En fazla 50 duyuru saklayabilirsin. Eski duyurulardan birini sil.",
-      );
-    const result = id
-      ? await tx.announcement.update({
-          where: { id },
-          data: { ...data, updatedAt: new Date() },
-        })
-      : await tx.announcement.create({
-          data: { ...data, id: crypto.randomUUID() },
-        });
-    await audit(
-      tx,
-      actor,
-      "ADMIN_ANNOUNCEMENT_SAVED",
-      result.id,
-      `Duyuru kaydedildi: ${data.title}`,
-      {
-        before: before
-          ? {
-              title: before.title,
-              body: before.body,
-              published: before.published,
-              position: before.position,
-              linkPath: before.linkPath,
-              linkLabel: before.linkLabel,
-            }
-          : {},
-        after: data,
-      },
+  requireReviewer(actor);
+  const { id, body, content: input, ...fields } = announcementInput.parse(raw);
+  const blocks = announcementBlocksInput.parse(
+    input ?? [{ type: "text", id: "legacy-text", text: body ?? "" }],
+  );
+  const imageIds = new Set(
+    blocks.filter((block) => block.type === "image").map((block) => block.id),
+  );
+  if ([...files.keys()].some((key) => !imageIds.has(key)))
+    throw new DomainError(
+      "IMAGE_INVALID",
+      "Görsel bir içerik bloğuna ait olmalı.",
     );
-    return result.id;
-  });
+  if (
+    [...files.values()].reduce((size, file) => size + file.size, 0) >
+    MAX_ANNOUNCEMENT_UPLOAD_BYTES
+  )
+    throw new DomainError(
+      "IMAGE_SIZE",
+      "Bir kayıtta toplam en fazla 12 MB görsel yükleyebilirsin.",
+    );
+  const uploaded = new Map<string, Awaited<ReturnType<typeof uploadImage>>>();
+  const removed: string[] = [];
+  let savedId: string;
+  try {
+    // Do not hold the administrative lock during remote uploads.
+    for (const [key, file] of files) {
+      const prepared = await prepareImage(file, { width: 2400, height: 2400 });
+      if (prepared)
+        uploaded.set(
+          key,
+          await uploadImage(prepared, mediaFolder("announcements")),
+        );
+    }
+    savedId = await administrativeWrite(db, actor, async (tx) => {
+      const before = id
+        ? await tx.announcement.findUnique({ where: { id } })
+        : null;
+      if (id && !before)
+        throw new DomainError("NOT_FOUND", "Duyuru bulunamadı.");
+      const previous = readAnnouncementBlocks(
+        before?.content,
+        before?.body ?? "",
+      );
+      const content: AnnouncementBlock[] = blocks.map((block) => {
+        if (block.type === "text") return block;
+        const image = uploaded.get(block.id);
+        if (image) return { ...block, ...image };
+        const existing = previous.find(
+          (old) => old.type === "image" && old.id === block.id,
+        );
+        if (!existing || existing.type !== "image")
+          throw new DomainError(
+            "IMAGE_MISSING",
+            "Her görsel bloğu için bir dosya seç veya boş bloğu kaldır.",
+          );
+        return { ...existing, alt: block.alt };
+      });
+      const kept = new Set(
+        content
+          .filter((block) => block.type === "image")
+          .map((block) => block.publicId),
+      );
+      for (const block of previous)
+        if (block.type === "image" && !kept.has(block.publicId))
+          removed.push(block.publicId);
+      const data = { ...fields, body: announcementText(blocks), content };
+      const result = id
+        ? await tx.announcement.update({
+            where: { id },
+            data: { ...data, updatedAt: new Date() },
+          })
+        : await tx.announcement.create({
+            data: { ...data, id: crypto.randomUUID() },
+          });
+      await audit(
+        tx,
+        actor,
+        "ADMIN_ANNOUNCEMENT_SAVED",
+        result.id,
+        `Duyuru kaydedildi: ${data.title}`,
+        {
+          before: before
+            ? {
+                title: before.title,
+                body: before.body,
+                content: before.content,
+                published: before.published,
+                position: before.position,
+                linkPath: before.linkPath,
+                linkLabel: before.linkLabel,
+              }
+            : {},
+          after: data,
+        },
+      );
+      return result.id;
+    });
+  } catch (error) {
+    for (const image of uploaded.values()) await deleteImage(image.publicId);
+    throw error;
+  }
+  for (const publicId of removed) await deleteImage(publicId);
+  return savedId;
 }
 
 export async function saveSlide(
@@ -204,11 +277,11 @@ export async function deleteSiteContent(
   z.string().min(1).max(128).parse(id);
   z.enum(["announcement", "slide"]).parse(kind);
   const removedPublicId = await administrativeWrite(db, actor, async (tx) => {
-    const before: { title: string; imagePublicId?: string | null } | null =
+    const before =
       kind === "announcement"
         ? await tx.announcement.findUnique({
             where: { id },
-            select: { title: true },
+            select: { title: true, content: true, body: true },
           })
         : await tx.homeSlide.findUnique({
             where: { id },
@@ -228,7 +301,11 @@ export async function deleteSiteContent(
       `Silindi: ${before.title}`,
       {},
     );
-    return before.imagePublicId ?? null;
+    return "content" in before
+      ? readAnnouncementBlocks(before.content, before.body)
+          .filter((block) => block.type === "image")
+          .map((block) => block.publicId)
+      : [before.imagePublicId];
   });
-  await deleteImage(removedPublicId);
+  for (const publicId of removedPublicId) await deleteImage(publicId);
 }
