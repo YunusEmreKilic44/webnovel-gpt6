@@ -62,9 +62,6 @@
     "typescript": "^6.0.3",
     "vitest": "^5.0.1"
   },
-  "optionalDependencies": {
-    "@rolldown/binding-win32-x64-msvc": "^1.2.9"
-  },
   "overrides": {
     "@prisma/config": {
       "deepmerge-ts": "^8.0.2"
