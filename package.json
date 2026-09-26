@@ -47,7 +47,6 @@
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
     "@playwright/test": "^1.63.0",
-    "@rolldown/binding-win32-x64-msvc": "^1.2.9",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^22.20.3",
     "@types/pg": "^8.23.1",
