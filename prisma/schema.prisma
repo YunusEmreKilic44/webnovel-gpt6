@@ -318,7 +318,9 @@ model Session {
 
 model User {
   id              String            @id
-  name            String
+  name            String            @unique(map: "user_name_unique")
+  /// Assigned from name by the database on insert; stable across name changes.
+  slug            String            @unique(map: "user_slug_unique") @default(dbgenerated())
   email           String
   emailVerified   Boolean           @default(false) @map("email_verified")
   image           String?

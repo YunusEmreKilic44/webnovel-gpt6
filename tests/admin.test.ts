@@ -47,6 +47,7 @@ const { db, close } = createLocalDatabase(client);
 const admin = {
   id: "admin",
   name: "Yönetici",
+  slug: "yonetici",
   email: "admin@example.test",
   role: "admin",
   emailVerified: true,
@@ -56,17 +57,23 @@ const admin = {
 const secondAdmin = {
   ...admin,
   id: "second-admin",
+  name: "İkinci Yönetici",
+  slug: "ikinci-yonetici",
   email: "second@example.test",
 };
 const writer = {
   ...admin,
   id: "writer",
+  name: "Yazar",
+  slug: "yazar",
   email: "writer@example.test",
   role: "reader",
 };
 const unverified = {
   ...writer,
   id: "unverified",
+  name: "Doğrulanmamış Okur",
+  slug: "dogrulanmamis-okur",
   email: "unverified@example.test",
   emailVerified: false,
 };

@@ -34,6 +34,7 @@ const { db, close } = createLocalDatabase(client);
 const author = {
   id: "writer",
   name: "Yazar",
+  slug: "yazar",
   email: "writer@example.test",
   emailVerified: true,
   role: "reader",
@@ -54,7 +55,16 @@ beforeAll(async () => {
   vi.mocked(getDb).mockReturnValue(db);
   await migrateLocal(client);
   await db.user.createMany({
-    data: [author, { ...author, id: "other", email: "other@example.test" }],
+    data: [
+      author,
+      {
+        ...author,
+        id: "other",
+        name: "Diğer Yazar",
+        slug: "diger-yazar",
+        email: "other@example.test",
+      },
+    ],
   });
   await db.book.createMany({
     data: [

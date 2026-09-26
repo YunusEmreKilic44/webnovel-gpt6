@@ -7,6 +7,23 @@ import { assertSessionAllowed } from "./ban-policy";
 export { isLocalPreview } from "./auth-preview";
 import { APIError } from "better-auth/api";
 import { isEmailConfigured, sendEmail } from "./email";
+import { validateUserName } from "@/modules/account/identity";
+import { DomainError } from "@/modules/publishing/policies";
+import { revalidateTag } from "next/cache";
+import { CATALOG_TAG } from "@/modules/catalog/queries";
+
+async function authUserName(raw: unknown, userId?: string) {
+  try {
+    return await validateUserName(getDb(), raw, userId);
+  } catch (error) {
+    if (error instanceof DomainError)
+      throw new APIError("BAD_REQUEST", {
+        code: error.code,
+        message: error.message,
+      });
+    throw error;
+  }
+}
 /** Accounts must verify their email unless this is local development. */
 export function emailVerificationRequired() {
   return !(
@@ -27,6 +44,7 @@ function createAuth() {
     database: prismaAdapter(getDb(), { provider: "postgresql" }),
     user: {
       additionalFields: {
+        slug: { type: "string", required: false, input: false },
         role: { type: "string", defaultValue: "reader", input: false },
         banned: { type: "boolean", defaultValue: false, input: false },
         // Read with the session so the header avatar needs no extra query.
@@ -66,7 +84,24 @@ function createAuth() {
                   "Kayıt şu an kapalı: doğrulama e-postası gönderilemiyor.",
                 code: "EMAIL_SERVICE_UNAVAILABLE",
               });
-            return { data: { ...value, emailVerified: skipVerification } };
+            const name = await authUserName(value.name);
+            return {
+              data: { ...value, name, emailVerified: skipVerification },
+            };
+          },
+        },
+        update: {
+          before: async (value, context) => {
+            if (value.name === undefined) return;
+            const name = await authUserName(
+              value.name,
+              context?.context.session?.user.id,
+            );
+            return { data: { ...value, name } };
+          },
+          after: async (_user, context) => {
+            if (context?.path === "/update-user")
+              revalidateTag(CATALOG_TAG, { expire: 0 });
           },
         },
       },

@@ -180,6 +180,10 @@ tests/                        İş kuralları ve Playwright tarayıcı testleri
 
 ## Kontroller
 
+Kullanıcı kimliği: `User.name`, PostgreSQL'in metin eşitliğiyle benzersizdir (büyük/küçük harf farklı ad sayılır). Kayıt ve ad güncellemelerinde baş/son boşluklar temizlenir ve 2–60 karakter sınırı uygulanır. `User.slug`, ekleme trigger'ı tarafından addan üretilir; Türkçe karakterler dönüştürülür, çakışmalara sayısal ek verilir. Slug benzersiz ve değişmezdir; ad değişince profil adresi korunur. Herkese açık rota `/yazar/[slug]`, ilişkiler ve yetki kontrolleri kullanıcı ID'siyle çalışır. Eski ID adresleri kalıcı olarak slug adresine yönlenir.
+
+Bu değişikliği dağıtırken `npm run build` ve uygulamayı başlatmadan önce `npm run db:migrate` çalıştırın; build, Prisma istemcisini de yeniden üretir. `20261006000000_user_identity`, mevcut hesapların sluglarını doldurur. Aynı ada sahip hesaplar varsa migration, adları kendiliğinden değiştirmeden durur. Ön kontrol: `SELECT name, array_agg(id) FROM "user" GROUP BY name HAVING count(*) > 1;`. Çakışmaları giderdikten sonra başarısız migration kaydını Prisma'nın `migrate resolve --rolled-back 20261006000000_user_identity` komutuyla çözerek migration'ı yeniden uygulayın. Yerel aktarım script'i eski kayıtların sluglarını hedef veritabanında oluşturur; mevcut slugları korur.
+
 ```sh
 npm run typecheck
 npm run lint

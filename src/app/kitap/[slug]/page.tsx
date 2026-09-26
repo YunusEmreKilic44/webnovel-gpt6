@@ -94,7 +94,7 @@ async function BookDetail({ params }: Props) {
           </div>
           <h1>{book.title}</h1>
           <p className="detail-author">
-            <Link href={`/yazar/${book.authorId}`}>
+            <Link href={`/yazar/${book.authorSlug}`}>
               <Avatar
                 name={book.author}
                 url={book.authorAvatarUrl}
@@ -383,7 +383,7 @@ async function Comments({ bookId }: { bookId: string }) {
           <div className="comment-body">
             <div className="comment-meta">
               <strong>
-                <Link href={`/yazar/${comment.userId}`}>{comment.name}</Link>
+                <Link href={`/yazar/${comment.userSlug}`}>{comment.name}</Link>
               </strong>
               <time dateTime={comment.createdAt.toISOString()}>
                 {date(comment.createdAt)}

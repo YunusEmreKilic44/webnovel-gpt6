@@ -47,10 +47,16 @@ const reader = {
   role: "reader",
   emailVerified: true,
 };
-const author = { ...reader, id: "author", email: "author@example.test" };
+const author = {
+  ...reader,
+  id: "author",
+  name: "Yazar Kişi",
+  email: "author@example.test",
+};
 const admin = {
   ...reader,
   id: "admin",
+  name: "Yönetici Kişi",
   email: "admin@example.test",
   role: "admin",
 };

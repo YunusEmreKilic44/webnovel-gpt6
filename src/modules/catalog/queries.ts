@@ -47,6 +47,7 @@ export type CatalogBook = Pick<
 > & {
   tags: string[];
   author: string;
+  authorSlug: string;
   authorAvatarUrl: string | null;
   chapterCount: number;
   volumeCount: number;
@@ -75,6 +76,7 @@ const catalogColumns = Prisma.sql`
   b.story_status AS "storyStatus", b.premium_status AS "premiumStatus",
   b.author_id AS "authorId", b.featured, b.updated_at AS "updatedAt", u.name AS author,
   u.avatar_url AS "authorAvatarUrl",
+  u.slug AS "authorSlug",
   ch.chapter_count AS "chapterCount", ch.volume_count AS "volumeCount",
   rt.average_rating AS "averageRating", rt.rating_count AS "ratingCount"
 `;
@@ -133,7 +135,7 @@ async function queryCatalog(filters: CatalogFilters): Promise<StoredBook[]> {
   `);
   return rows.map(storeBook);
 }
-const cachedCatalog = catalogCache("catalog-list-v4-avatar", queryCatalog);
+const cachedCatalog = catalogCache("catalog-list-v5-author-slug", queryCatalog);
 
 export async function getCatalog(filters: CatalogFilters = {}) {
   // Free-text and user-defined tag filters stay uncached: arbitrary terms grow the key space
@@ -183,7 +185,10 @@ async function queryPublicBook(slug: string) {
   `);
   return rows[0] ? storeBook(rows[0]) : null;
 }
-const cachedPublicBook = catalogCache("public-book-v4-avatar", queryPublicBook);
+const cachedPublicBook = catalogCache(
+  "public-book-v5-author-slug",
+  queryPublicBook,
+);
 
 export const getPublicBook = cache(async (slug: string) => {
   const row = await cachedPublicBook(slug);
@@ -273,7 +278,7 @@ export const getBookComments = cache(async (bookId: string) => {
       body: true,
       spoiler: true,
       createdAt: true,
-      user: { select: { id: true, name: true, avatarUrl: true } },
+      user: { select: { id: true, slug: true, name: true, avatarUrl: true } },
       _count: { select: { likes: true } },
     },
     orderBy: { createdAt: "desc" },
@@ -282,6 +287,7 @@ export const getBookComments = cache(async (bookId: string) => {
   return rows.map(({ user, ...comment }) => ({
     ...comment,
     userId: user.id,
+    userSlug: user.slug,
     name: user.name,
     avatarUrl: user.avatarUrl,
   }));
@@ -313,13 +319,20 @@ export async function getLibrary(userId: string) {
  * Public author page: the account (never banned ones) with its published,
  * visible books and totals computed from what readers can see.
  */
-export const getAuthorProfile = cache(async (userId: string) => {
+export const getAuthorProfile = cache(async (slug: string) => {
   const db = getDb();
   const user = await db.user.findFirst({
-    where: { id: userId, banned: false },
-    select: { id: true, name: true, avatarUrl: true, createdAt: true },
+    where: { slug, banned: false },
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      avatarUrl: true,
+      createdAt: true,
+    },
   });
   if (!user) return null;
+  const userId = user.id;
   const [books, reads] = await Promise.all([
     db.$queryRaw<CatalogBook[]>(Prisma.sql`
       SELECT ${catalogColumns}

@@ -1,7 +1,7 @@
-import { Suspense } from "react";
+import { cache, Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
 import { getAuthorProfile } from "@/modules/catalog/queries";
 import { Avatar } from "@/components/avatar";
@@ -27,14 +27,27 @@ import {
   removeProfileCommentAction,
 } from "@/modules/social/actions";
 
-type Props = { params: Promise<{ userId: string }> };
+type Props = { params: Promise<{ slug: string }> };
+
+const resolveProfile = cache(async (slug: string) => {
+  const profile = await getAuthorProfile(slug);
+  if (profile) return profile;
+  // Keep previously shared ID URLs working, with a single canonical address.
+  const legacy = await getDb().user.findFirst({
+    where: { id: slug, banned: false },
+    select: { slug: true },
+  });
+  if (legacy) permanentRedirect(`/yazar/${legacy.slug}`);
+  return null;
+});
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { userId } = await params;
-  const profile = await getAuthorProfile(userId);
+  const { slug } = await params;
+  const profile = await resolveProfile(slug);
   return profile
     ? {
         title: `${profile.user.name} · Yazar`,
+        alternates: { canonical: `/yazar/${profile.user.slug}` },
         description: `${profile.user.name} adlı yazarın Satır'daki hikâyeleri.`,
       }
     : { title: "Yazar bulunamadı" };
@@ -57,8 +70,8 @@ export default function AuthorPage(props: Props) {
 }
 
 async function AuthorProfile({ params }: Props) {
-  const { userId } = await params;
-  const profile = await getAuthorProfile(userId);
+  const { slug } = await params;
+  const profile = await resolveProfile(slug);
   if (!profile) notFound();
   const { user, books, stats } = profile;
   return (
@@ -287,7 +300,7 @@ async function ProfileComments({
               <div className="comment-body">
                 <div className="comment-meta">
                   <strong>
-                    <Link href={`/yazar/${comment.author.id}`}>
+                    <Link href={`/yazar/${comment.author.slug}`}>
                       {comment.author.name}
                     </Link>
                   </strong>

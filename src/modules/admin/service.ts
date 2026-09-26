@@ -7,6 +7,11 @@ import { DomainError, requireReviewer } from "@/modules/publishing/policies";
 import { bookInput } from "@/modules/publishing/service";
 import { deleteImage } from "@/lib/cloudinary";
 import {
+  isNameConflict,
+  nameTakenMessage,
+  userNameInput,
+} from "@/modules/account/identity";
+import {
   bookTagSelection,
   replaceBookTags,
   tagNames,
@@ -21,7 +26,7 @@ const baseInput = z.object({
     .max(1000),
 });
 export const userInput = baseInput.extend({
-  name: z.string().trim().min(2).max(60),
+  name: userNameInput,
   role: z.enum(["reader", "admin"]),
 });
 export const bookUpdateInput = baseInput.extend({
@@ -143,6 +148,10 @@ export async function updateUser(
       before: { name: target.name, role: target.role },
       after: { name: input.name, role: input.role },
     });
+  }).catch((error: unknown) => {
+    if (isNameConflict(error))
+      throw new DomainError("NAME_TAKEN", nameTakenMessage);
+    throw error;
   });
 }
 

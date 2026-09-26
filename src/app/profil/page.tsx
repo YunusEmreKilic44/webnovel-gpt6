@@ -66,7 +66,7 @@ async function Profile() {
               : "E-posta doğrulaması bekleniyor"}
           </span>
         </div>
-        <Link href={`/yazar/${user.id}`} className="button button-outline">
+        <Link href={`/yazar/${user.slug}`} className="button button-outline">
           Herkese açık profilim
         </Link>
         <Link href="/ayarlar" className="button button-outline">

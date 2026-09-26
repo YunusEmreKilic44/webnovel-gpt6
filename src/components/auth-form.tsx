@@ -73,6 +73,8 @@ export function AuthForm({
                 });
       if (result.error) {
         const messages: Record<string, string> = {
+          NAME_TAKEN: "Bu kullanıcı adı zaten kullanılıyor.",
+          INVALID_NAME: "Görünen adın 2–60 karakter olmalı.",
           BANNED_USER:
             "Hesabın banlandı. Ban kaldırılana kadar giriş yapamazsın.",
           INVALID_EMAIL_OR_PASSWORD: "E-posta veya şifre hatalı.",

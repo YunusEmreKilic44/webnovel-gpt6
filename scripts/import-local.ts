@@ -97,11 +97,27 @@ try {
             `Hedef ${table} tablosu boş değil; aktarım durduruldu.`,
           );
       }
-      for (const { table, data } of records) {
+      for (const record of records) {
+        const { table } = record;
+        let { data } = record;
         await client.query(
           `INSERT INTO public."${table}" SELECT * FROM json_populate_recordset(NULL::public."${table}", $1::json)`,
           [data],
         );
+        if (table === "user") {
+          // Legacy rows receive a slug from the target's insert trigger.
+          const generated = await client.query<{ id: string; slug: string }>(
+            'SELECT id, slug FROM public."user"',
+          );
+          const slugs = new Map(
+            generated.rows.map((row) => [row.id, row.slug]),
+          );
+          data = JSON.stringify(
+            (JSON.parse(data) as { id: string; slug?: string | null }[]).map(
+              (row) => ({ ...row, slug: row.slug ?? slugs.get(row.id) }),
+            ),
+          );
+        }
         const { rows } = await client.query(
           `SELECT NOT EXISTS (
             (SELECT to_jsonb(t) FROM public."${table}" t EXCEPT SELECT to_jsonb(s) FROM json_populate_recordset(NULL::public."${table}", $1::json) s)

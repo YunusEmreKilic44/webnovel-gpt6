@@ -140,6 +140,11 @@ export async function removeProfileComment(
       "NOT_FOUND",
       "Yorum bulunamadı veya silme yetkin yok.",
     );
+  const comment = await db.profileComment.findUniqueOrThrow({
+    where: { id: commentId },
+    select: { profileUserId: true },
+  });
+  return comment.profileUserId;
 }
 
 export async function getProfileComments(db: Database, profileUserId: string) {
@@ -151,7 +156,7 @@ export async function getProfileComments(db: Database, profileUserId: string) {
       id: true,
       body: true,
       createdAt: true,
-      author: { select: { id: true, name: true, avatarUrl: true } },
+      author: { select: { id: true, slug: true, name: true, avatarUrl: true } },
     },
   });
 }

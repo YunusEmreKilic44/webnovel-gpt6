@@ -294,7 +294,7 @@ function ReportTargetPreview({
           {" → "}
           <Link
             className="text-link"
-            href={`/yazar/${profileComment.profileUser.id}`}
+            href={`/yazar/${profileComment.profileUser.slug}`}
           >
             {profileComment.profileUser.name} profili
           </Link>{" "}

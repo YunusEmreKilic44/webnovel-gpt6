@@ -34,8 +34,13 @@ const author = {
   role: "reader",
   emailVerified: true,
 };
-const other = { ...author, id: "other-author" };
-const admin = { ...author, id: "tag-admin", role: "admin" };
+const other = { ...author, id: "other-author", name: "Diğer Etiket Yazarı" };
+const admin = {
+  ...author,
+  id: "tag-admin",
+  name: "Etiket Yöneticisi",
+  role: "admin",
+};
 const details = {
   title: "Etiketli Yolculuk",
   description:

@@ -36,8 +36,17 @@ const writer = {
   role: "reader",
   emailVerified: true,
 };
-const stranger = { ...writer, id: "image-stranger" };
-const admin = { ...writer, id: "image-admin", role: "admin" };
+const stranger = {
+  ...writer,
+  id: "image-stranger",
+  name: "Diğer Görsel Yazarı",
+};
+const admin = {
+  ...writer,
+  id: "image-admin",
+  name: "Görsel Yöneticisi",
+  role: "admin",
+};
 const text = {
   type: "paragraph",
   content: [
@@ -369,6 +378,7 @@ describe("Bölüm görselleri", () => {
       ...writer,
       email: "writer@example.test",
       avatarUrl: null,
+      slug: "yazar",
       coinBalance: 0,
     });
     const response = await request();

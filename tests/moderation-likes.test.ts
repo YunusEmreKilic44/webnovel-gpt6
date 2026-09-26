@@ -25,9 +25,9 @@ const admin = {
   role: "admin",
   emailVerified: true,
 };
-const otherAdmin = { ...admin, id: "other-admin" };
-const reader = { ...admin, id: "reader", role: "reader" };
-const otherReader = { ...reader, id: "other-reader" };
+const otherAdmin = { ...admin, id: "other-admin", name: "İkinci Yönetici" };
+const reader = { ...admin, id: "reader", name: "Okur", role: "reader" };
+const otherReader = { ...reader, id: "other-reader", name: "İkinci Okur" };
 const reason = "Tekrarlanan topluluk kuralı ihlalleri.";
 const likeInput = { bookId: "book", commentId: "comment", liked: true };
 
@@ -260,9 +260,11 @@ describe("Kitap yorumu beğenileri", () => {
   });
 
   it("istek sınırını aştığında beğeni yazmaz", async () => {
-    await db.rateLimit.create({
-      data: { key: `${reader.id}:comment-like`, count: 60 },
-    });
+    // Use the database clock, just like the production rate-limit query.
+    await db.$executeRaw`
+      INSERT INTO rate_limits (key, count, window_start)
+      VALUES (${`${reader.id}:comment-like`}, 60, now())
+    `;
     await expect(setCommentLike(db, reader, likeInput)).rejects.toMatchObject({
       code: "RATE_LIMIT",
     });

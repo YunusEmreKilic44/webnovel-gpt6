@@ -12,11 +12,14 @@ test("profil menüsü, hesap bilgileri, okuma tercihleri ve şifre değişikliğ
   browser,
 }) => {
   test.setTimeout(180000);
-  const email = `profile-${Date.now()}@example.test`;
+  const suffix = Date.now();
+  const email = `profile-${suffix}@example.test`;
+  const name = `Profil Okuru ${suffix}`;
+  const updatedName = `Yeni Okur ${suffix}`;
   const password = "Account-test-password!2026";
   const newPassword = "Updated-test-password!2026";
   await page.goto("/kayit");
-  await page.getByLabel("Görünen adın").fill("Profil Okuru");
+  await page.getByLabel("Görünen adın").fill(name);
   await page.getByLabel("E-posta adresin").fill(email);
   await page.getByLabel("Şifren", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Hesap oluştur" }).click();
@@ -41,7 +44,18 @@ test("profil menüsü, hesap bilgileri, okuma tercihleri ve şifre değişikliğ
   await trigger.click();
   await menu.getByRole("menuitem", { name: "Profilim" }).click();
   await expect(page).toHaveURL(/\/profil$/);
-  await expect(page.locator(".profile-identity h2")).toHaveText("Profil Okuru");
+  await expect(page.locator(".profile-identity h2")).toHaveText(name);
+  const publicProfile = page.getByRole("link", {
+    name: "Herkese açık profilim",
+  });
+  await expect(publicProfile).toHaveAttribute(
+    "href",
+    `/yazar/profil-okuru-${suffix}`,
+  );
+  await publicProfile.click();
+  await expect(page).toHaveURL(new RegExp(`/yazar/profil-okuru-${suffix}$`));
+  await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+  await page.goto("/profil");
   await expect(page.locator(".profile-stats strong")).toHaveText([
     "0",
     "0",
@@ -52,7 +66,7 @@ test("profil menüsü, hesap bilgileri, okuma tercihleri ve şifre değişikliğ
     fullPage: true,
   });
   await page.getByRole("link", { name: "Profili düzenle" }).click();
-  await page.getByLabel("Görünen adın").fill("Yeni Okur");
+  await page.getByLabel("Görünen adın").fill(updatedName);
   await page.getByRole("button", { name: "Profili kaydet" }).click();
   await expect(
     page.getByText("Profilin güncellendi.", { exact: true }),
@@ -63,7 +77,7 @@ test("profil menüsü, hesap bilgileri, okuma tercihleri ve şifre değişikliğ
   await page.getByRole("button", { name: "Tercihleri kaydet" }).click();
   await expect(page.getByText("Okuma tercihlerin kaydedildi.")).toBeVisible();
   await page.reload();
-  await expect(page.getByLabel("Görünen adın")).toHaveValue("Yeni Okur");
+  await expect(page.getByLabel("Görünen adın")).toHaveValue(updatedName);
   await expect(
     page.getByRole("radio", { name: "Sepya", exact: true }),
   ).toBeChecked();

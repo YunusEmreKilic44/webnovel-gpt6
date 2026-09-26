@@ -28,6 +28,14 @@ function failure(error: unknown, fallback: string): ActionState {
 }
 const value = (form: FormData, key: string) => String(form.get(key) ?? "");
 
+async function refreshProfile(userId: string) {
+  const user = await getDb().user.findUnique({
+    where: { id: userId },
+    select: { slug: true },
+  });
+  if (user) revalidatePath(`/yazar/${user.slug}`);
+}
+
 export async function followAction(
   _: ActionState,
   form: FormData,
@@ -38,7 +46,7 @@ export async function followAction(
   const follow = value(form, "follow") === "true";
   try {
     await setFollow(getDb(), actor, authorId, follow);
-    revalidatePath(`/yazar/${authorId}`);
+    await refreshProfile(authorId);
     return {
       ok: true,
       message: follow
@@ -63,7 +71,7 @@ export async function addProfileCommentAction(
       profileUserId,
       body: value(form, "body"),
     });
-    revalidatePath(`/yazar/${profileUserId}`);
+    await refreshProfile(profileUserId);
     return {
       ok: true,
       message: "Yorumun paylaşıldı.",
@@ -81,8 +89,12 @@ export async function removeProfileCommentAction(
   const actor = await getCurrentUser();
   if (!actor) return signIn;
   try {
-    await removeProfileComment(getDb(), actor, value(form, "commentId"));
-    revalidatePath(`/yazar/${value(form, "profileUserId")}`);
+    const profileUserId = await removeProfileComment(
+      getDb(),
+      actor,
+      value(form, "commentId"),
+    );
+    await refreshProfile(profileUserId);
     return { ok: true, message: "Yorum silindi.", nonce: crypto.randomUUID() };
   } catch (error) {
     return failure(error, "Yorum silinemedi.");

@@ -57,7 +57,7 @@ const admin = {
   role: "admin",
   emailVerified: true,
 };
-const reader = { ...admin, id: "reader", role: "reader" };
+const reader = { ...admin, id: "reader", name: "Okur", role: "reader" };
 const announcement = {
   title: "Yeni duyuru",
   body: "Yeni hikâyeler yayında.",

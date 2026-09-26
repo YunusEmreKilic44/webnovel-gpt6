@@ -9,6 +9,7 @@ import { getCurrentUser } from "@/lib/session";
 import type { ActionState } from "@/lib/action-state";
 import { DomainError } from "@/modules/publishing/policies";
 import { updateAvatar } from "./service";
+import { isNameConflict, nameTakenMessage, userNameInput } from "./identity";
 
 export async function updateProfile(
   _: ActionState,
@@ -21,7 +22,7 @@ export async function updateProfile(
       message: "Devam etmek için giriş yapmalısın.",
       href: "/giris",
     };
-  const result = z.string().trim().min(2).max(60).safeParse(form.get("name"));
+  const result = userNameInput.safeParse(form.get("name"));
   if (!result.success)
     return { ok: false, message: "Görünen adın 2–60 karakter olmalı." };
   try {
@@ -33,7 +34,8 @@ export async function updateProfile(
     updateTag(CATALOG_TAG);
     revalidatePath("/", "layout");
     return { ok: true, message: "Profilin güncellendi." };
-  } catch {
+  } catch (error) {
+    if (isNameConflict(error)) return { ok: false, message: nameTakenMessage };
     return { ok: false, message: "Profilin güncellenemedi. Tekrar dene." };
   }
 }

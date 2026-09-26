@@ -54,6 +54,18 @@ describe("Hesap ayarlarının yetki sınırları", () => {
     expect((await updateProfile(initialActionState, form)).ok).toBe(false);
     expect(mocks.update).not.toHaveBeenCalled();
   });
+  it("kullanımdaki ad için anlaşılır hata döndürür", async () => {
+    mocks.update.mockRejectedValueOnce({
+      code: "P2002",
+      meta: { target: ["name"] },
+    });
+    const form = new FormData();
+    form.set("name", "Alınmış Ad");
+    expect(await updateProfile(initialActionState, form)).toEqual({
+      ok: false,
+      message: "Bu kullanıcı adı zaten kullanılıyor.",
+    });
+  });
   it("geçersiz okuma tercihlerini kaydetmez", async () => {
     const form = new FormData();
     form.set("theme", "sepia");

@@ -98,7 +98,7 @@ test("kayıt, kütüphane, yorum, yayın ve premium onayı", async ({
   test.setTimeout(180000);
   const suffix = Date.now();
   await page.goto("/kayit");
-  await page.getByLabel("Görünen adın").fill("Deneme Yazarı");
+  await page.getByLabel("Görünen adın").fill(`Deneme Yazarı ${suffix}`);
   await page
     .getByLabel("E-posta adresin")
     .fill(`writer-${suffix}@example.test`);

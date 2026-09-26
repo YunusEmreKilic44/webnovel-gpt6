@@ -237,7 +237,7 @@ export async function getReportTarget(db: Database, type: string, id: string) {
         hidden: true,
         createdAt: true,
         author: { select: { id: true, name: true } },
-        profileUser: { select: { id: true, name: true } },
+        profileUser: { select: { id: true, slug: true, name: true } },
       },
     });
     return (
